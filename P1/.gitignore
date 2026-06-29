@@ -73,3 +73,6 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# Content assets are not tracked in this repo (sourced from marketplace packs / imported locally)
+Content/*
