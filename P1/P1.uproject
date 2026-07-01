@@ -7,7 +7,12 @@
 		{
 			"Name": "P1",
 			"Type": "Runtime",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"CoreUObject",
+				"ModularGameplay"
+			]
 		}
 	],
 	"Plugins": [
@@ -28,6 +33,14 @@
 		},
 		{
 			"Name": "EditorToolset",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
+			"Name": "ModularGameplay",
 			"Enabled": true
 		}
 	]
