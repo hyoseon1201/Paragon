@@ -40,7 +40,9 @@ void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float Da
 	const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, GetAbilityLevel(), ContextHandle);
 	if (SpecHandle.IsValid())
 	{
-		// ExecCalc_Damage가 이 값을 읽어 최종 데미지에 곱한다. GE가 SetByCaller를 참조하지 않으면 무시됨.
+		// ExecCalc_Damage가 이 채널들을 읽어 최종 데미지를 산출한다. GE가 SetByCaller를 참조하지 않으면 무시됨.
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_Flat, FlatDamage);
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_PhysicalPower, PhysicalPowerCoefficient);
 		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_DamageMultiplier, DamageMultiplier);
 		const FActiveGameplayEffectHandle ActiveHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		UE_LOG(LogP1, Log, TEXT("[DamageAbility] Applied %s to %s (Multiplier=%.2f) → ActiveHandle valid=%d"),

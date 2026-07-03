@@ -26,8 +26,12 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 
-	// 어빌리티 활성 중 입력 press 감지 — 콤보 윈도우가 열려 있으면 다음 콤보를 예약한다.
+	// 어빌리티 활성 중 입력 press — bInputHeld=true, 윈도우 열려 있으면 콤보 예약.
 	virtual void InputPressed(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo) override;
+
+	// 입력 release — bInputHeld=false.
+	virtual void InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo) override;
 
 private:
@@ -72,6 +76,10 @@ private:
 
 	// 콤보 윈도우 중 입력이 감지됨 — 몽타주 종료 시 다음 콤보 재생 트리거.
 	bool bNextComboQueued = false;
+
+	// 현재 버튼이 눌린 상태. Spec->InputPressed(서버에서 stale 가능) 대신 이 플래그를 사용한다.
+	// 클라/서버 모두 InputPressed()/InputReleased() RPC 콜백으로 정확하게 추적된다.
+	bool bInputHeld = false;
 
 	// OnBlendOut에서 다음 콤보를 이미 시작했을 때 OnCompleted의 EndAttack 호출을 막는 플래그.
 	bool bContinuingCombo = false;

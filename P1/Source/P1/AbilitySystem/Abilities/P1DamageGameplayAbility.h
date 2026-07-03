@@ -17,10 +17,19 @@ class P1_API UP1DamageGameplayAbility : public UP1GameplayAbility
 	GENERATED_BODY()
 
 protected:
-	// DamageMultiplier: 1.0 = 100% 데미지 (주목표), Cleave/100 = 범위 데미지.
-	// ExecCalc_Damage가 구현되면 이 값을 SetByCaller로 읽어 최종 데미지에 곱한다.
+	// DamageMultiplier: 1.0 = 100% 데미지 (주목표), Cleave = 범위 데미지.
+	// ExecCalc_Damage가 SetByCaller로 이 값과 DamageCoefficient를 읽어 최종 데미지를 산출한다.
 	void ApplyDamageToTarget(AActor* TargetActor, float DamageMultiplier = 1.0f);
 
 	UPROPERTY(EditDefaultsOnly, Category = "Damage")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	// 스탯 무관 고정 데미지 (Data.Damage.Flat 채널).
+	UPROPERTY(EditDefaultsOnly, Category = "Damage")
+	float FlatDamage = 0.0f;
+
+	// PhysicalPower 계수 (Data.Damage.PhysicalPower 채널). ExecCalc에서 Source.PhysicalPower와 곱해진다.
+	// 기본공격=1.0, 강한 스킬일수록 높게. BP 서브클래스에서 조정.
+	UPROPERTY(EditDefaultsOnly, Category = "Damage")
+	float PhysicalPowerCoefficient = 1.0f;
 };

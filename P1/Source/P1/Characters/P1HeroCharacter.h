@@ -11,6 +11,7 @@ class UGameplayAbility;
 class UGameplayEffect;
 class UP1CameraComponent;
 class UP1HeroComponent;
+class UMotionWarpingComponent;
 
 UCLASS()
 class P1_API AP1HeroCharacter : public AP1CharacterBase
@@ -47,4 +48,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Character")
 	TObjectPtr<UP1HeroComponent> HeroComponent;
+
+	// 도약/대시 스킬(RMB, R 등)의 루트모션 워프 타깃 처리.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Character")
+	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 };

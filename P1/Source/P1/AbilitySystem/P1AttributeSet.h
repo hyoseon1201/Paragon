@@ -103,6 +103,13 @@ public:
 	FGameplayAttributeData MovementSpeed;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, MovementSpeed)
 
+	// --- Meta (transient, 비복제) ---
+	// ExecCalc_Damage가 최종 데미지를 여기에 누적하고, PostGameplayEffectExecute에서 Health로 변환한다.
+	// 서버에서만 계산되므로 복제하지 않는다.
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
+	FGameplayAttributeData Damage;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, Damage)
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;

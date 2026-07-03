@@ -102,7 +102,21 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		*Attr.GetName(), Magnitude,
 		GetOwningActor() ? *GetOwningActor()->GetName() : TEXT("null"));
 
-	if (Attr == GetHealthAttribute())
+	if (Attr == GetDamageAttribute())
+	{
+		// 메타 Damage → Health 변환. ExecCalc가 방어/관통까지 반영한 최종값을 누적해둔다.
+		const float LocalDamage = GetDamage();
+		SetDamage(0.0f);
+		if (LocalDamage > 0.0f)
+		{
+			const float NewHealth = FMath::Clamp(GetHealth() - LocalDamage, 0.0f, GetMaxHealth());
+			UE_LOG(LogP1, Log, TEXT("[AttributeSet] Damage %.2f applied: Health %.2f → %.2f"),
+				LocalDamage, GetHealth(), NewHealth);
+			SetHealth(NewHealth);
+			// TODO: 사망 처리 / 히트리액트 이벤트 트리거
+		}
+	}
+	else if (Attr == GetHealthAttribute())
 	{
 		const float OldHealth = GetHealth();
 		SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));

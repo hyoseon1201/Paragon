@@ -37,6 +37,10 @@ void UP1GameplayAbility_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecH
 
 	UE_LOG(LogP1, Log, TEXT("[MeleeAttack] ActivateAbility called"));
 	CurrentComboIndex = 0;
+	// 최초 활성화는 TryActivateAbility 경로 → InputPressed() 콜백이 없다.
+	// 활성화 = 버튼을 눌러 트리거된 것이므로 held 상태로 시작해야 홀드 콤보가 동작한다.
+	// 버튼을 떼면 InputReleased()가 (이제 서버에도 복제되어) bInputHeld를 false로 만든다.
+	bInputHeld = true;
 	PlayCurrentComboMontage();
 }
 
@@ -44,11 +48,18 @@ void UP1GameplayAbility_MeleeAttack::InputPressed(const FGameplayAbilitySpecHand
 	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
 {
 	Super::InputPressed(Handle, ActorInfo, ActivationInfo);
-
+	bInputHeld = true;
 	if (bComboWindowOpen)
 	{
 		bNextComboQueued = true;
 	}
+}
+
+void UP1GameplayAbility_MeleeAttack::InputReleased(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
+{
+	Super::InputReleased(Handle, ActorInfo, ActivationInfo);
+	bInputHeld = false;
 }
 
 void UP1GameplayAbility_MeleeAttack::PlayCurrentComboMontage()
@@ -92,9 +103,13 @@ void UP1GameplayAbility_MeleeAttack::OnHitEventReceived(FGameplayEventData Paylo
 
 	bComboWindowOpen = true;
 
-	// Spec->InputPressed는 서버에서 InputReleased RPC가 아직 미도착인 경우 stale 상태일 수 있어
-	// 여기서 체크하면 탭(단발) 공격이 서버에서 콤보로 오판된다.
-	// hold-to-combo는 InputPressed()에서만 처리하고, 여기서는 체크하지 않는다.
+	// hold-to-combo: 버튼을 누른 채로 히트 이벤트에 도달하면 즉시 콤보 예약.
+	// bInputHeld는 InputPressed()/InputReleased() RPC 콜백으로 추적되므로
+	// Spec->InputPressed(서버에서 stale 가능)와 달리 클라/서버 모두 정확하다.
+	if (bInputHeld)
+	{
+		bNextComboQueued = true;
+	}
 
 	// 데미지 판정은 서버에서만 수행.
 	if (!CurrentActorInfo->IsNetAuthority())
@@ -287,6 +302,7 @@ void UP1GameplayAbility_MeleeAttack::OnMontageCancelled()
 void UP1GameplayAbility_MeleeAttack::EndAttack()
 {
 	CurrentComboIndex = 0;
+	bInputHeld = false;
 
 	if (IsActive())
 	{

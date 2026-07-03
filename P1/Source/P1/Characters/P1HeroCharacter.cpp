@@ -10,6 +10,7 @@
 #include "GameplayEffect.h"
 #include "Camera/P1CameraComponent.h"
 #include "Characters/P1HeroComponent.h"
+#include "MotionWarpingComponent.h"
 #include "Components/WidgetComponent.h"
 #include "UI/Widget/P1FloatingStatusWidget.h"
 #include "UI/HUD/P1HUD.h"
@@ -28,6 +29,8 @@ AP1HeroCharacter::AP1HeroCharacter()
 	CameraComponent->SetupAttachment(GetRootComponent());
 
 	HeroComponent = CreateDefaultSubobject<UP1HeroComponent>(TEXT("HeroComponent"));
+
+	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 }
 
 FGenericTeamId AP1HeroCharacter::GetGenericTeamId() const

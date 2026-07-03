@@ -7,3 +7,17 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_BasicAttack, "Ability.BasicAttack", "
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Attacking, "State.Attacking", "기본공격 모션 재생 중 상태 — 재입력 차단 등에 사용")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_BasicAttackHit, "Event.Montage.BasicAttackHit", "기본공격 몽타주의 타격 프레임에서 발생하는 게임플레이 이벤트")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_DamageMultiplier, "Data.DamageMultiplier", "GE 스펙에 SetByCaller로 전달되는 데미지 배율 — ExecCalc에서 읽어 클리브/스킬 계수에 사용")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Damage_Flat, "Data.Damage.Flat", "스탯 무관 고정 데미지 채널. ExecCalc가 Raw에 그대로 더한다")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Damage_PhysicalPower, "Data.Damage.PhysicalPower", "PhysicalPower 계수 채널. ExecCalc가 Source.PhysicalPower와 곱해 Raw에 더한다")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Hero, "Character.Type.Hero", "플레이어가 조종하는 영웅 캐릭터")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Boss, "Character.Type.Boss", "보스 몬스터")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Minion, "Character.Type.Minion", "일반 미니언/졸개")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_InputTag_Ability_RMB, "InputTag.Ability.RMB", "우클릭 어빌리티 입력 태그 (Assault The Gates)")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_AssaultTheGates, "Ability.AssaultTheGates", "Assault The Gates 어빌리티 식별 태그")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_TargetingAbility, "State.TargetingAbility", "지면 조준 중 상태 — ASC가 LMB=확정/RMB=취소로 리라우팅하고 나머지 어빌리티 입력 차단")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_AssaultTheGates_Land, "Event.Montage.AssaultTheGates.Land", "도약 몽타주의 착지 프레임 이벤트 — 서버 범위 피해 판정 트리거")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_AssaultTheGates, "Cooldown.Ability.AssaultTheGates", "Assault The Gates 쿨다운 GE가 부여하는 태그")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Buff_MovementSpeed, "Buff.MovementSpeed", "이동속도 증가 버프 식별 태그")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_CooldownDuration, "Data.CooldownDuration", "쿨다운 GE의 SetByCaller 지속시간 채널 — 어빌리티가 동적으로 쿨다운 길이 지정")

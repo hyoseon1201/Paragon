@@ -2,6 +2,7 @@
 
 #include "Characters/P1CharacterBase.h"
 #include "Components/WidgetComponent.h"
+#include "AbilitySystem/P1GameplayTags.h"
 #include "P1.h"
 
 AP1CharacterBase::AP1CharacterBase()
@@ -12,6 +13,14 @@ AP1CharacterBase::AP1CharacterBase()
 	FloatingStatusComponent->SetWidgetSpace(EWidgetSpace::World);
 	FloatingStatusComponent->SetDrawSize(FVector2D(180.f, 50.f));
 	FloatingStatusComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	// 기본 유형은 영웅. 미니언/보스 서브클래스 BP에서 CharacterType을 재설정한다.
+	CharacterType = TAG_Character_Type_Hero;
+}
+
+bool AP1CharacterBase::IsHeroOrBoss() const
+{
+	return CharacterType == TAG_Character_Type_Hero || CharacterType == TAG_Character_Type_Boss;
 }
 
 bool AP1CharacterBase::IsSameTeam(const AActor* A, const AActor* B)

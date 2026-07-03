@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "GenericTeamAgentInterface.h"
+#include "GameplayTagContainer.h"
 #include "P1CharacterBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -26,6 +27,12 @@ public:
 
 	static bool IsSameTeam(const AActor* A, const AActor* B);
 
+	// 캐릭터 유형 태그 반환 (Character.Type.*).
+	FGameplayTag GetCharacterType() const { return CharacterType; }
+
+	// 영웅 또는 보스인지 — RMB "영웅/보스 적중 시" 조건 등에서 사용.
+	bool IsHeroOrBoss() const;
+
 	// IGenericTeamAgentInterface
 	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(TeamId); }
 
@@ -34,6 +41,11 @@ protected:
 	// 추후 GameMode가 서버에서 할당하는 방식으로 교체 예정.
 	UPROPERTY(EditAnywhere, Category = "Team")
 	uint8 TeamId = 255;
+
+	// 캐릭터 유형. 생성자에서 Character.Type.Hero로 기본 설정.
+	// 미니언/보스 BP에서 각각 Minion/Boss로 변경.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
+	FGameplayTag CharacterType;
 
 	// ASC의 원본은 AP1HeroCharacter는 PlayerState, AP1MinionCharacter는 Pawn 자신에 있음.
 	UPROPERTY()
