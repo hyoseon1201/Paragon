@@ -10,7 +10,6 @@
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimMontage.h"
-#include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
 
 UP1GameplayAbility_MeleeAttack::UP1GameplayAbility_MeleeAttack()
@@ -19,8 +18,12 @@ UP1GameplayAbility_MeleeAttack::UP1GameplayAbility_MeleeAttack()
 	NewAssetTags.AddTag(TAG_Ability_BasicAttack);
 	SetAssetTags(NewAssetTags);
 
-	ActivationBlockedTags.AddTag(TAG_State_Attacking);
-	ActivationOwnedTags.AddTag(TAG_State_Attacking);
+	// State.Attacking 소유/차단은 베이스 UP1GameplayAbility에서 전 어빌리티 공통으로 처리한다.
+
+	// Sacred Oath 같은 "다음 기본공격 강화" 시너지가 있는 영웅은 이 클래스가 아니라
+	// UP1GameplayAbility_MeleeAttack_SacredOath를 자신의 유일한 BasicAttack 어빌리티로 등록한다.
+	// (같은 InputTag를 두고 어빌리티끼리 태그로 경쟁하는 대신, 영웅별로 어떤 서브클래스를 쓸지가
+	// 곧 "이 영웅이 그 시너지를 갖는지"를 결정한다 — 상세 배경은 CLAUDE.md 참고)
 }
 
 void UP1GameplayAbility_MeleeAttack::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -139,34 +142,13 @@ void UP1GameplayAbility_MeleeAttack::OnHitEventReceived(FGameplayEventData Paylo
 
 	const FVector SourceLocation = SourceCharacter->GetActorLocation();
 
-	// ECC_Pawn 채널로 쿼리 후 Cast<AP1CharacterBase>로 걸러냄.
-	// ObjectType 기반 쿼리는 콜리전 프리셋에 따라 캐릭터를 놓칠 수 있어 채널 기반이 더 안정적.
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(SourceCharacter);
+	// 구 오버랩 + 팀/높이 필터는 공용 헬퍼(GetEnemiesInRadius)가 처리. 여기서는 전방 반원 필터만 추가로 적용.
+	const TArray<AActor*> NearbyEnemies = GetEnemiesInRadius(SourceLocation, AttackRange, AttackHalfHeight);
 
-	TArray<FOverlapResult> OverlapResults;
-	GetWorld()->OverlapMultiByChannel(OverlapResults, SourceLocation, FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(AttackRange), Params);
-
-	// 캐릭터 정면 180° + 높이 범위 필터링 → 반원 판정.
 	const FVector CharForward = SourceCharacter->GetActorForwardVector();
 	TArray<AActor*> EnemyTargets;
-	for (const FOverlapResult& Result : OverlapResults)
+	for (AActor* HitCharacter : NearbyEnemies)
 	{
-		// P1CharacterBase 계열만 대상으로 인정 — 지형/소품은 캐스트 실패로 자동 제외.
-		AP1CharacterBase* HitCharacter = Cast<AP1CharacterBase>(Result.GetActor());
-		if (!IsValid(HitCharacter))
-		{
-			continue;
-		}
-
-		const bool bSameTeam = AP1CharacterBase::IsSameTeam(SourceCharacter, HitCharacter);
-		UE_LOG(LogP1, Log, TEXT("[MeleeAttack] Overlap: %s | SameTeam=%d"), *HitCharacter->GetName(), bSameTeam ? 1 : 0);
-		if (bSameTeam)
-		{
-			continue;
-		}
-
 		const FVector ToTarget = HitCharacter->GetActorLocation() - SourceLocation;
 
 		// 정면 반원 — 수평 성분 기준 dot > 0인 대상만 포함.
@@ -176,14 +158,6 @@ void UP1GameplayAbility_MeleeAttack::OnHitEventReceived(FGameplayEventData Paylo
 		{
 			UE_LOG(LogP1, Log, TEXT("[MeleeAttack] %s filtered by forward (dot=%.2f)"),
 				*HitCharacter->GetName(), ForwardDot);
-			continue;
-		}
-
-		// 높이 범위 필터.
-		if (FMath::Abs(ToTarget.Z) > AttackHalfHeight)
-		{
-			UE_LOG(LogP1, Log, TEXT("[MeleeAttack] %s filtered by height (dZ=%.1f, limit=%.1f)"),
-				*HitCharacter->GetName(), ToTarget.Z, AttackHalfHeight);
 			continue;
 		}
 
@@ -262,6 +236,11 @@ void UP1GameplayAbility_MeleeAttack::OnHitEventReceived(FGameplayEventData Paylo
 	UE_LOG(LogP1, Log, TEXT("[MeleeAttack] PrimaryTarget=%s | EnemyCount=%d | CleavePct=%.2f"),
 		PrimaryTarget ? *PrimaryTarget->GetName() : TEXT("null"), EnemyTargets.Num(), CleavePct);
 
+	ApplyComboHitDamage(EnemyTargets, PrimaryTarget, CleavePct);
+}
+
+void UP1GameplayAbility_MeleeAttack::ApplyComboHitDamage(const TArray<AActor*>& EnemyTargets, AActor* PrimaryTarget, float CleavePct)
+{
 	for (AActor* Enemy : EnemyTargets)
 	{
 		const float Multiplier = (Enemy == PrimaryTarget) ? 1.0f : CleavePct;

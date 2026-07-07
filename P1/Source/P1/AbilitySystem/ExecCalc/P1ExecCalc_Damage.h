@@ -13,12 +13,15 @@
 // 어빌리티는 자기가 쓰는 채널만 채우고, 나머지는 0으로 무시된다.
 //
 // Raw            = Data.Damage.Flat + Data.Damage.PhysicalPower * Source.PhysicalPower
+//                  + Data.Damage.MagicalPower * Source.MagicalPower
+//                  + Data.Damage.TargetMaxHealthPct * Target.MaxHealth
+//                  + Data.Damage.SourceMaxHealthPct * Source.MaxHealth
 // PreMitigation  = Raw * Data.DamageMultiplier
 // EffectiveArmor = max(0, Target.PhysicalArmor - Source.PhysicalPenetration)
 // Mitigation     = ArmorConstant / (EffectiveArmor + ArmorConstant)   // 데미지가 통과하는 비율
 // FinalDamage    = PreMitigation * Mitigation → Target.Damage(메타)에 누적
 //
-// 미래 확장: MagicalPower/TargetMaxHealthPct 채널 추가, damage-type 태그로 물리/마법 방어 선택.
+// 미래 확장: damage-type 태그로 물리/마법 방어(PhysicalArmor vs MagicalArmor) 선택.
 UCLASS()
 class P1_API UP1ExecCalc_Damage : public UGameplayEffectExecutionCalculation
 {

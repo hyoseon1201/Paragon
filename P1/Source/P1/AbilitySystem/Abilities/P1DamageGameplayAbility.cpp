@@ -5,8 +5,12 @@
 #include "AbilitySystem/P1GameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Characters/P1CharacterBase.h"
+#include "Engine/OverlapResult.h"
 
-void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float DamageMultiplier)
+void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float DamageMultiplier,
+	float BonusFlat, float BonusPhysicalPowerCoeff, float BonusMagicalPowerCoeff,
+	float BonusTargetMaxHealthPctCoeff, float BonusSourceMaxHealthPctCoeff)
 {
 	if (!IsValid(TargetActor))
 	{
@@ -41,8 +45,12 @@ void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float Da
 	if (SpecHandle.IsValid())
 	{
 		// ExecCalc_Damage가 이 채널들을 읽어 최종 데미지를 산출한다. GE가 SetByCaller를 참조하지 않으면 무시됨.
-		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_Flat, FlatDamage);
-		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_PhysicalPower, PhysicalPowerCoefficient);
+		// Bonus 파라미터는 클래스 기본 계수 위에 이번 호출 한정으로 얹는다 (기본 0 = 평소와 동일).
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_Flat, FlatDamage.GetValueAtLevel(GetAbilityLevel()) + BonusFlat);
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_PhysicalPower, PhysicalPowerCoefficient + BonusPhysicalPowerCoeff);
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_MagicalPower, MagicalPowerCoefficient + BonusMagicalPowerCoeff);
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_TargetMaxHealthPct, TargetMaxHealthPctCoefficient + BonusTargetMaxHealthPctCoeff);
+		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_SourceMaxHealthPct, SourceMaxHealthPctCoefficient + BonusSourceMaxHealthPctCoeff);
 		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_DamageMultiplier, DamageMultiplier);
 		const FActiveGameplayEffectHandle ActiveHandle = SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		UE_LOG(LogP1, Log, TEXT("[DamageAbility] Applied %s to %s (Multiplier=%.2f) → ActiveHandle valid=%d"),
@@ -52,4 +60,46 @@ void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float Da
 	{
 		UE_LOG(LogP1, Warning, TEXT("[DamageAbility] MakeOutgoingSpec 실패 — DamageEffectClass=%s"), *DamageEffectClass->GetName());
 	}
+}
+
+TArray<AActor*> UP1DamageGameplayAbility::GetEnemiesInRadius(const FVector& Center, float Radius, float HalfHeight) const
+{
+	TArray<AActor*> EnemyTargets;
+
+	AP1CharacterBase* SourceCharacter = GetP1CharacterFromActorInfo();
+	if (!IsValid(SourceCharacter))
+	{
+		return EnemyTargets;
+	}
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(SourceCharacter);
+
+	TArray<FOverlapResult> OverlapResults;
+	GetWorld()->OverlapMultiByChannel(OverlapResults, Center, FQuat::Identity,
+		ECC_Pawn, FCollisionShape::MakeSphere(Radius), Params);
+
+	for (const FOverlapResult& Result : OverlapResults)
+	{
+		// P1CharacterBase 계열만 대상으로 인정 — 지형/소품은 캐스트 실패로 자동 제외.
+		AP1CharacterBase* HitCharacter = Cast<AP1CharacterBase>(Result.GetActor());
+		if (!IsValid(HitCharacter))
+		{
+			continue;
+		}
+
+		if (AP1CharacterBase::IsSameTeam(SourceCharacter, HitCharacter))
+		{
+			continue;
+		}
+
+		if (FMath::Abs(HitCharacter->GetActorLocation().Z - Center.Z) > HalfHeight)
+		{
+			continue;
+		}
+
+		EnemyTargets.Add(HitCharacter);
+	}
+
+	return EnemyTargets;
 }

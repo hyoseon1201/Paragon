@@ -58,7 +58,8 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 			else
 			{
 				const bool bActivated = TryActivateAbility(AbilitySpec.Handle);
-				UE_LOG(LogP1, Log, TEXT("[ASC]   TryActivateAbility result: %d"), bActivated ? 1 : 0);
+				UE_LOG(LogP1, Log, TEXT("[ASC]   TryActivateAbility result: %d (Ability=%s)"),
+					bActivated ? 1 : 0, *AbilitySpec.Ability->GetName());
 			}
 		}
 	}

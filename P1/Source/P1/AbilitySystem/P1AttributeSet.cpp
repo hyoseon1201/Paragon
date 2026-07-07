@@ -15,6 +15,7 @@ UP1AttributeSet::UP1AttributeSet()
 	InitManaRegen(1.2f);
 
 	InitPhysicalPower(68.0f);
+	InitMagicalPower(0.0f);
 	InitAttackSpeed(1.0f);
 	InitBasicAttackTime(1.1f);
 	InitAttackRange(275.0f);
@@ -42,6 +43,7 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, ManaRegen, COND_None, REPNOTIFY_Always);
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, PhysicalPower, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MagicalPower, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AttackSpeed, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, BasicAttackTime, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AttackRange, COND_None, REPNOTIFY_Always);
@@ -162,6 +164,11 @@ void UP1AttributeSet::OnRep_ManaRegen(const FGameplayAttributeData& OldValue)
 void UP1AttributeSet::OnRep_PhysicalPower(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, PhysicalPower, OldValue);
+}
+
+void UP1AttributeSet::OnRep_MagicalPower(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, MagicalPower, OldValue);
 }
 
 void UP1AttributeSet::OnRep_AttackSpeed(const FGameplayAttributeData& OldValue)

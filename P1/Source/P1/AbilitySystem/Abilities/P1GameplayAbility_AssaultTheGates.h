@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/P1DamageGameplayAbility.h"
 #include "Abilities/GameplayAbilityTargetTypes.h"
+#include "ScalableFloat.h"
 #include "P1GameplayAbility_AssaultTheGates.generated.h"
 
 class UAnimMontage;
@@ -97,9 +98,11 @@ private:
 	float AOEHalfHeight = 200.0f;
 
 	// --- 쿨다운 ---
-	// 기본 쿨다운(초). 쿨다운 GE는 SetByCaller(Data.CooldownDuration)로 이 값을 사용.
+	// 기본 쿨다운(초). 쿨다운 GE는 SetByCaller(Data.CooldownDuration)로 이 값을 사용 — GE 자체의
+	// Scalable Float 대신 C++에서 값을 직접 넣어주는 방식이라(감소 재적용 등 동적 조정 때문에)
+	// 레벨 스케일링도 여기서 FScalableFloat로 직접 관리한다 (Curve 미지정 시 고정값).
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Cooldown")
-	float BaseCooldown = 12.0f;
+	FScalableFloat BaseCooldown = FScalableFloat(12.0f);
 
 	// 영웅/보스 적중 시 쿨다운 감소율 (0~1).
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Cooldown", meta = (ClampMin = "0.0", ClampMax = "1.0"))

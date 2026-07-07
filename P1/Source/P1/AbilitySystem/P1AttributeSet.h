@@ -53,6 +53,10 @@ public:
 	FGameplayAttributeData PhysicalPower;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, PhysicalPower)
 
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MagicalPower, Category = "Attributes|Combat")
+	FGameplayAttributeData MagicalPower;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, MagicalPower)
+
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_AttackSpeed, Category = "Attributes|Combat")
 	FGameplayAttributeData AttackSpeed;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, AttackSpeed)
@@ -129,6 +133,8 @@ protected:
 	virtual void OnRep_ManaRegen(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_PhysicalPower(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_MagicalPower(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_AttackSpeed(const FGameplayAttributeData& OldValue);
 	UFUNCTION()

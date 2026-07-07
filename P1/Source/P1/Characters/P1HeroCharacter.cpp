@@ -10,6 +10,7 @@
 #include "GameplayEffect.h"
 #include "Camera/P1CameraComponent.h"
 #include "Characters/P1HeroComponent.h"
+#include "Characters/P1BuffCosmeticEffectComponent.h"
 #include "MotionWarpingComponent.h"
 #include "Components/WidgetComponent.h"
 #include "UI/Widget/P1FloatingStatusWidget.h"
@@ -74,6 +75,13 @@ void AP1HeroCharacter::InitAbilityActorInfo()
 
 	ASC->InitAbilityActorInfo(P1PS, this);
 	CachedAbilitySystemComponent = ASC;
+
+	// 버프 태그에 반응하는 코스메틱 이펙트(검 발광 등)가 있는 영웅이면(컴포넌트가 붙어있으면) ASC를 넘겨준다.
+	// 어떤 태그/이펙트인지는 전부 컴포넌트 쪽 데이터가 갖고 있어 이 클래스는 특정 스킬을 몰라도 된다.
+	if (UP1BuffCosmeticEffectComponent* CosmeticComp = FindComponentByClass<UP1BuffCosmeticEffectComponent>())
+	{
+		CosmeticComp->BindToAbilitySystemComponent(ASC);
+	}
 
 	if (HasAuthority() && DefaultAttributesEffect)
 	{

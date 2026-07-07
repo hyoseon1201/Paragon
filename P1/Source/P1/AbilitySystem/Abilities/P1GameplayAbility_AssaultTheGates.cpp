@@ -32,12 +32,8 @@ UP1GameplayAbility_AssaultTheGates::UP1GameplayAbility_AssaultTheGates()
 
 	InputTag = TAG_InputTag_Ability_RMB;
 
-	// 조준~도약~착지 전체 구간 동안 State.Attacking을 소유해 기본공격(LMB) 재발동을 막는다.
-	// 막지 않으면 도약 중 LMB가 같은 슬롯의 몽타주를 끼워 넣어 이 어빌리티의 몽타주를 인터럽트하고,
-	// 그 결과 ApplyRootMotionJumpForce가 포물선 도중에 강제 종료되어 잔여 속도로 통제 불가능하게
-	// 멀리 날아가는 버그가 생긴다. MeleeAttack은 이미 State.Attacking을 ActivationBlockedTags로 체크하므로
-	// 이 태그만 부여하면 MeleeAttack 쪽 수정 없이 막힌다.
-	ActivationOwnedTags.AddTag(TAG_State_Attacking);
+	// State.Attacking 소유/차단은 베이스 UP1GameplayAbility에서 전 어빌리티 공통으로 처리한다
+	// (조준~도약~착지 전체 구간 동안 다른 어빌리티 발동을 막아, 인터럽트로 인한 잔여속도 버그를 방지).
 }
 
 void UP1GameplayAbility_AssaultTheGates::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -107,7 +103,7 @@ void UP1GameplayAbility_AssaultTheGates::OnTargetDataReady(const FGameplayAbilit
 	// 쿨다운은 서버 권위로 적용(복제). 기본 지속시간으로 시작하고, 영웅/보스 적중 시 감소.
 	if (CurrentActorInfo->IsNetAuthority())
 	{
-		ApplyCooldownWithDuration(BaseCooldown);
+		ApplyCooldownWithDuration(BaseCooldown.GetValueAtLevel(GetAbilityLevel()));
 	}
 
 	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates] 확정 → 도약 @ %s"), *ConfirmedLocation.ToString());
@@ -333,17 +329,7 @@ void UP1GameplayAbility_AssaultTheGates::PerformLandDamage(const FVector& Center
 	// 이동속도 버프 (자신).
 	if (MoveSpeedBuffEffectClass)
 	{
-		UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
-		if (ASC)
-		{
-			FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
-			Ctx.AddSourceObject(Source);
-			const FGameplayEffectSpecHandle BuffSpec = ASC->MakeOutgoingSpec(MoveSpeedBuffEffectClass, GetAbilityLevel(), Ctx);
-			if (BuffSpec.IsValid())
-			{
-				ASC->ApplyGameplayEffectSpecToSelf(*BuffSpec.Data.Get());
-			}
-		}
+		ApplyEffectToSelf(MoveSpeedBuffEffectClass);
 	}
 
 	// 쿨다운 감소.
@@ -415,12 +401,7 @@ void UP1GameplayAbility_AssaultTheGates::ApplyCooldownWithDuration(float Duratio
 		return;
 	}
 
-	const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingGameplayEffectSpec(CooldownGE->GetClass(), GetAbilityLevel());
-	if (SpecHandle.IsValid())
-	{
-		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_CooldownDuration, Duration);
-		ApplyGameplayEffectSpecToOwner(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle);
-	}
+	ApplyEffectToSelf(CooldownGE->GetClass(), TAG_Data_CooldownDuration, Duration);
 }
 
 void UP1GameplayAbility_AssaultTheGates::ReduceCooldown(float Percent)

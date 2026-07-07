@@ -34,11 +34,19 @@ protected:
 	virtual void InputReleased(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo) override;
 
+	// 콤보 히트 판정에서 실제 데미지를 적용하는 지점 — 서브클래스가 이 훅만 오버라이드해 콤보/몽타주
+	// 로직 전체를 복제하지 않고도 데미지 계산 방식을 바꿀 수 있다 (예: 버프로 강화된 공격 변종).
+	// 기본 구현: Cleave 기반 배율로 주목표 100% / 그 외 대상 Cleave%만큼 데미지.
+	virtual void ApplyComboHitDamage(const TArray<AActor*>& EnemyTargets, AActor* PrimaryTarget, float CleavePct);
+
+	// AnimNotify 히트 프레임마다 호출 — 적중 여부와 무관하게 "스윙이 발생했다"는 시점 자체를 나타낸다.
+	// 서브클래스가 이 훅을 오버라이드하면 적을 맞혔는지와 무관하게(허공을 휘둘러도) 매 스윙마다
+	// 반응하는 코스메틱 이펙트(예: 버프 지속 중 트레일 재생)를 넣을 수 있다 — Super 호출은 필수.
+	UFUNCTION()
+	virtual void OnHitEventReceived(FGameplayEventData Payload);
+
 private:
 	void PlayCurrentComboMontage();
-
-	UFUNCTION()
-	void OnHitEventReceived(FGameplayEventData Payload);
 
 	UFUNCTION()
 	void OnMontageBlendingOut();
