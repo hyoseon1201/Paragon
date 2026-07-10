@@ -12,6 +12,11 @@
 #include "Animation/AnimMontage.h"
 #include "DrawDebugHelpers.h"
 
+FGameplayTag UP1GameplayAbility_MeleeAttack::GetUICooldownTag() const
+{
+	return TAG_Cooldown_Ability_BasicAttack;
+}
+
 UP1GameplayAbility_MeleeAttack::UP1GameplayAbility_MeleeAttack()
 {
 	FGameplayTagContainer NewAssetTags;
@@ -85,8 +90,24 @@ void UP1GameplayAbility_MeleeAttack::PlayCurrentComboMontage()
 		ActiveHitEventTask = nullptr;
 	}
 
+	const float PlayRate = GetComputedMontagePlayRate(ComboMontages[CurrentComboIndex]);
+
+	// 스킬 아이콘 UI 전용 "다음 공격까지 남은 시간" 타이머 — 서버에서만 적용, 리플리케이트된 태그
+	// 변경을 통해 소유 클라이언트의 위젯 컨트롤러가 감지한다(다른 쿨다운 UI 훅과 동일 패턴).
+	UE_LOG(LogP1, Log, TEXT("[MeleeAttack][AttackTimer] PlayCurrentComboMontage — Auth=%d AttackTimerEffectClass=%s PlayRate=%.3f"),
+		(CurrentActorInfo && CurrentActorInfo->IsNetAuthority()) ? 1 : 0,
+		AttackTimerEffectClass ? *AttackTimerEffectClass->GetName() : TEXT("NULL(미설정)"), PlayRate);
+
+	if (CurrentActorInfo && CurrentActorInfo->IsNetAuthority() && AttackTimerEffectClass && PlayRate > 0.0f)
+	{
+		const float SwingDuration = ComboMontages[CurrentComboIndex]->GetPlayLength() / PlayRate;
+		const FActiveGameplayEffectHandle Handle = ApplyEffectToSelf(AttackTimerEffectClass, TAG_Data_CooldownDuration, SwingDuration);
+		UE_LOG(LogP1, Log, TEXT("[MeleeAttack][AttackTimer] ApplyEffectToSelf(%s, SwingDuration=%.2f) → Handle valid=%d"),
+			*AttackTimerEffectClass->GetName(), SwingDuration, Handle.IsValid() ? 1 : 0);
+	}
+
 	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, ComboMontages[CurrentComboIndex], GetComputedMontagePlayRate(ComboMontages[CurrentComboIndex]));
+		this, NAME_None, ComboMontages[CurrentComboIndex], PlayRate);
 	MontageTask->OnBlendOut.AddDynamic(this, &UP1GameplayAbility_MeleeAttack::OnMontageBlendingOut);
 	MontageTask->OnCompleted.AddDynamic(this, &UP1GameplayAbility_MeleeAttack::OnMontageCompleted);
 	MontageTask->OnCancelled.AddDynamic(this, &UP1GameplayAbility_MeleeAttack::OnMontageCancelled);

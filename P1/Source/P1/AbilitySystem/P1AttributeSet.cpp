@@ -1,8 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AbilitySystem/P1AttributeSet.h"
+#include "AbilitySystem/P1GameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "GameplayEffectExtension.h"
+#include "AbilitySystemComponent.h"
 #include "P1.h"
 
 UP1AttributeSet::UP1AttributeSet()
@@ -109,7 +111,36 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		// 메타 Damage → Health 변환. ExecCalc가 방어/관통까지 반영한 최종값을 누적해둔다.
 		const float LocalDamage = GetDamage();
 		SetDamage(0.0f);
-		if (LocalDamage > 0.0f)
+
+		UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+
+		// 무적 상태(State.Invulnerable)면 데미지를 완전히 무시 — 스테이시스류 스킬이 공용으로 사용.
+		const bool bInvulnerable = ASC && ASC->HasMatchingGameplayTag(TAG_State_Invulnerable);
+
+		// Stoicism 디플렉트: 이 데미지가 기본공격에서 왔고(발생시킨 어빌리티의 Asset Tag가 스펙에 실려있음,
+		// UP1DamageGameplayAbility::ApplyDamageToTarget 참고), 이 캐릭터가 디플렉트를 갖고 있으며
+		// (루즈 태그로 존재 여부 판별) 쿨다운 중이 아니면(네이티브 쿨다운 태그 부재=사용 가능) 무효화.
+		// 실제 쿨다운 커밋은 어빌리티에게 이벤트로 위임 — AttributeSet은 어빌리티 클래스를 몰라도 된다.
+		bool bDeflected = false;
+		if (ASC && !bInvulnerable)
+		{
+			const FGameplayTagContainer* SourceTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
+			const bool bFromBasicAttack = SourceTags && SourceTags->HasTag(TAG_Ability_BasicAttack);
+			const bool bHasStoicismDeflect = ASC->HasMatchingGameplayTag(TAG_Ability_StoicismDeflect);
+			const bool bDeflectOnCooldown = ASC->HasMatchingGameplayTag(TAG_Cooldown_Ability_StoicismDeflect);
+			if (bFromBasicAttack && bHasStoicismDeflect && !bDeflectOnCooldown)
+			{
+				bDeflected = true;
+				UE_LOG(LogP1, Log, TEXT("[AttributeSet] Stoicism 디플렉트 발동 — 기본공격 %.2f 무효화 (Owner=%s)"),
+					LocalDamage, GetOwningActor() ? *GetOwningActor()->GetName() : TEXT("null"));
+
+				FGameplayEventData EventData;
+				EventData.EventTag = TAG_Event_StoicismDeflect_Consumed;
+				ASC->HandleGameplayEvent(TAG_Event_StoicismDeflect_Consumed, &EventData);
+			}
+		}
+
+		if (LocalDamage > 0.0f && !bInvulnerable && !bDeflected)
 		{
 			const float NewHealth = FMath::Clamp(GetHealth() - LocalDamage, 0.0f, GetMaxHealth());
 			UE_LOG(LogP1, Log, TEXT("[AttributeSet] Damage %.2f applied: Health %.2f → %.2f"),

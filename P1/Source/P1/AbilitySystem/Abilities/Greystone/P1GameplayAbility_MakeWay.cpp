@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AbilitySystem/Abilities/P1GameplayAbility_MakeWay.h"
+#include "AbilitySystem/Abilities/Greystone/P1GameplayAbility_MakeWay.h"
 #include "P1.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"

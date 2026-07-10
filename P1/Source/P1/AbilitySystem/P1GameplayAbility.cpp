@@ -4,6 +4,7 @@
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"
 #include "Player/P1PlayerController.h"
+#include "Player/P1PlayerState.h"
 #include "GameplayEffect.h"
 
 UP1GameplayAbility::UP1GameplayAbility()
@@ -32,6 +33,25 @@ AP1PlayerController* UP1GameplayAbility::GetP1PlayerControllerFromActorInfo() co
 {
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
 	return ActorInfo ? Cast<AP1PlayerController>(ActorInfo->PlayerController.Get()) : nullptr;
+}
+
+int32 UP1GameplayAbility::GetP1CharacterLevel() const
+{
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	const AP1PlayerState* P1PS = ActorInfo ? Cast<AP1PlayerState>(ActorInfo->OwnerActor.Get()) : nullptr;
+	return P1PS ? P1PS->GetCharacterLevel() : 1;
+}
+
+FGameplayTag UP1GameplayAbility::GetUICooldownTag() const
+{
+	if (const FGameplayTagContainer* CooldownTags = GetCooldownTags())
+	{
+		for (const FGameplayTag& Tag : *CooldownTags)
+		{
+			return Tag;
+		}
+	}
+	return FGameplayTag();
 }
 
 FActiveGameplayEffectHandle UP1GameplayAbility::ApplyEffectToSelf(TSubclassOf<UGameplayEffect> EffectClass,

@@ -1,8 +1,9 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AbilitySystem/Abilities/P1GameplayAbility_AssaultTheGates.h"
+#include "AbilitySystem/Abilities/Greystone/P1GameplayAbility_AssaultTheGates.h"
 #include "P1.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1AnimNotify_SendGameplayEvent.h"
 #include "AbilitySystem/TargetActors/P1TargetActor_GroundDecal.h"
 #include "Characters/P1CharacterBase.h"
@@ -94,11 +95,19 @@ void UP1GameplayAbility_AssaultTheGates::OnTargetDataReady(const FGameplayAbilit
 	ConfirmedLocation = UAbilitySystemBlueprintLibrary::GetTargetDataEndPoint(Data, 0);
 
 	// 확정 시 코스트 소모. 감당 못하면 무취소 종료.
+	UAbilitySystemComponent* CostASC = GetAbilitySystemComponentFromActorInfo();
+	bool bFoundMana = false;
+	const float ManaBeforeCost = CostASC ? CostASC->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFoundMana) : 0.0f;
+
 	if (!CommitAbilityCost(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return;
 	}
+
+	const float ManaAfterCost = CostASC ? CostASC->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFoundMana) : 0.0f;
+	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates][Cost] Mana %.2f → %.2f (소모량=%.2f)"),
+		ManaBeforeCost, ManaAfterCost, ManaBeforeCost - ManaAfterCost);
 
 	// 쿨다운은 서버 권위로 적용(복제). 기본 지속시간으로 시작하고, 영웅/보스 적중 시 감소.
 	if (CurrentActorInfo->IsNetAuthority())
@@ -402,6 +411,16 @@ void UP1GameplayAbility_AssaultTheGates::ApplyCooldownWithDuration(float Duratio
 	}
 
 	ApplyEffectToSelf(CooldownGE->GetClass(), TAG_Data_CooldownDuration, Duration);
+
+	// 실제로 걸린 쿨다운을 즉시 재조회해 SetByCaller 값이 제대로 반영됐는지 확인.
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayTagContainer CooldownTags;
+		CooldownTags.AddTag(TAG_Cooldown_Ability_AssaultTheGates);
+		const TArray<float> Remaining = ASC->GetActiveEffectsTimeRemaining(FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(CooldownTags));
+		UE_LOG(LogP1, Log, TEXT("[AssaultTheGates][Cooldown] 요청 Duration=%.2f | 실제 남은시간=%s"),
+			Duration, Remaining.Num() > 0 ? *FString::SanitizeFloat(Remaining[0]) : TEXT("N/A(태그 없음)"));
+	}
 }
 
 void UP1GameplayAbility_AssaultTheGates::ReduceCooldown(float Percent)
@@ -429,8 +448,11 @@ void UP1GameplayAbility_AssaultTheGates::ReduceCooldown(float Percent)
 	}
 
 	// 남은 시간을 (1-Percent)로 재적용해 감소.
+	const float ReducedRemaining = MaxRemaining * (1.0f - Percent);
+	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates][Cooldown] 감소 적용: 남은시간 %.2f → %.2f (%.0f%% 감소)"),
+		MaxRemaining, ReducedRemaining, Percent * 100.0f);
 	ASC->RemoveActiveEffectsWithGrantedTags(CooldownTags);
-	ApplyCooldownWithDuration(MaxRemaining * (1.0f - Percent));
+	ApplyCooldownWithDuration(ReducedRemaining);
 }
 
 void UP1GameplayAbility_AssaultTheGates::SetTargetingState(bool bEnable)

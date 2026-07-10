@@ -9,6 +9,7 @@
 class UAnimMontage;
 class UAbilityTask_PlayMontageAndWait;
 class UAbilityTask_WaitGameplayEvent;
+class UGameplayEffect;
 struct FGameplayEventData;
 
 // 근접 기본공격 — 콤보 지원.
@@ -44,6 +45,16 @@ protected:
 	// 반응하는 코스메틱 이펙트(예: 버프 지속 중 트레일 재생)를 넣을 수 있다 — Super 호출은 필수.
 	UFUNCTION()
 	virtual void OnHitEventReceived(FGameplayEventData Payload);
+
+	// UP1GameplayAbility 참고 — 기본공격은 진짜 GAS 쿨다운이 없어(콤보를 막으면 안 되므로)
+	// CooldownGameplayEffectClass 대신 이 태그를 스킬 아이콘 UI가 구독하도록 오버라이드한다.
+	virtual FGameplayTag GetUICooldownTag() const override;
+
+	// 매 스윙 시작 시(PlayCurrentComboMontage) Data.CooldownDuration SetByCaller로 "다음 공격까지 남은
+	// 시간"(BasicAttackTime/AttackSpeed 기반 실제 스윙 소요시간)을 실어 적용 — Cooldown.Ability.BasicAttack
+	// 태그만 부여하는 순수 UI용 GE. CooldownGameplayEffectClass가 아니므로 발동 차단과 무관하다.
+	UPROPERTY(EditDefaultsOnly, Category = "Attack")
+	TSubclassOf<UGameplayEffect> AttackTimerEffectClass;
 
 private:
 	void PlayCurrentComboMontage();

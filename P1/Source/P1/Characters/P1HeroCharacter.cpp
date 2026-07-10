@@ -5,6 +5,7 @@
 #include "Player/P1PlayerController.h"
 #include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1GameplayAbility.h"
+#include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
@@ -154,23 +155,40 @@ void AP1HeroCharacter::AddDefaultAbilities()
 		}
 
 		FGameplayAbilitySpec AbilitySpec(AbilityClass, 1);
+		bool bActivateOnGranted = false;
 
 		if (const UP1GameplayAbility* AbilityCDO = AbilityClass->GetDefaultObject<UP1GameplayAbility>())
 		{
-			UE_LOG(LogP1, Log, TEXT("[GAS] Granting %s | InputTag=%s"),
-				*AbilityClass->GetName(), *AbilityCDO->InputTag.ToString());
+			UE_LOG(LogP1, Log, TEXT("[GAS] Granting %s | InputTag=%s | ActivateOnGranted=%d"),
+				*AbilityClass->GetName(), *AbilityCDO->InputTag.ToString(), AbilityCDO->bActivateOnGranted ? 1 : 0);
 
 			if (AbilityCDO->InputTag.IsValid())
 			{
 				AbilitySpec.GetDynamicSpecSourceTags().AddTag(AbilityCDO->InputTag);
 			}
+			bActivateOnGranted = AbilityCDO->bActivateOnGranted;
 		}
 		else
 		{
 			UE_LOG(LogP1, Warning, TEXT("[GAS] %s is not a UP1GameplayAbility subclass"), *AbilityClass->GetName());
 		}
 
-		ASC->GiveAbility(AbilitySpec);
+		// 입력도 트리거 이벤트도 없이 부여되자마자 스스로 계속 돌아야 하는 상시 패시브는
+		// GiveAbilityAndActivateOnce로 그 자리에서 1회 활성화한다 — 그 안에서 반복 타이머를
+		// 시작해 캐릭터 생존 내내 도는 방식(UP1GameplayAbility_StoicismVitality 등).
+		if (bActivateOnGranted)
+		{
+			ASC->GiveAbilityAndActivateOnce(AbilitySpec);
+		}
+		else
+		{
+			ASC->GiveAbility(AbilitySpec);
+		}
+	}
+
+	if (UP1AbilitySystemComponent* P1ASC = Cast<UP1AbilitySystemComponent>(ASC))
+	{
+		P1ASC->SetAbilitiesGiven();
 	}
 }
 

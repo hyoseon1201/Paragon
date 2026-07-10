@@ -3,21 +3,21 @@
 #include "UI/Widget/P1SkillIconWidget.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
-#include "Materials/MaterialInstanceDynamic.h"
+#include "Components/ProgressBar.h"
 #include "Engine/Texture2D.h"
+#include "P1.h"
 
 void UP1SkillIconWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	if (SkillIconImage)
+	{
+		SkillIconImage->SetColorAndOpacity(ReadyTint);
+	}
+
 	if (CooldownOverlay)
 	{
-		// WBP에서 CooldownOverlay의 Brush Material로 설정된 머터리얼로 MID 생성
-		if (UMaterialInterface* Mat = Cast<UMaterialInterface>(CooldownOverlay->GetBrush().GetResourceObject()))
-		{
-			CooldownMID = UMaterialInstanceDynamic::Create(Mat, this);
-			CooldownOverlay->SetBrushFromMaterial(CooldownMID);
-		}
 		CooldownOverlay->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	if (CooldownText)
@@ -43,7 +43,18 @@ void UP1SkillIconWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 
 void UP1SkillIconWidget::SetSkillIcon(UTexture2D* IconTexture)
 {
-	if (SkillIconImage && IconTexture)
+	UE_LOG(LogP1, Log, TEXT("[SkillIconWidget] SetSkillIcon(%s=%s) on %s | SkillIconImage 바인딩=%s"),
+		IconTexture ? TEXT("텍스처") : TEXT("NULL"),
+		IconTexture ? *IconTexture->GetName() : TEXT("N/A"),
+		*GetName(),
+		SkillIconImage ? TEXT("O") : TEXT("X(WBP에서 SkillIconImage 이름의 Image 위젯 미배치)"));
+
+	if (!IconTexture)
+	{
+		return;
+	}
+
+	if (SkillIconImage)
 	{
 		SkillIconImage->SetBrushFromTexture(IconTexture);
 	}
@@ -51,9 +62,18 @@ void UP1SkillIconWidget::SetSkillIcon(UTexture2D* IconTexture)
 
 void UP1SkillIconWidget::StartCooldown(float TotalCooldown)
 {
+	UE_LOG(LogP1, Log, TEXT("[SkillIconWidget] StartCooldown(%.2f) on %s | CooldownOverlay 바인딩=%s"),
+		TotalCooldown, *GetName(), CooldownOverlay ? TEXT("O") : TEXT("X(WBP에서 CooldownOverlay 이름의 ProgressBar 미배치)"));
+
 	TotalCooldownTime = FMath::Max(0.01f, TotalCooldown);
 	RemainingCooldown = TotalCooldownTime;
 	bOnCooldown = true;
+
+	if (SkillIconImage)
+	{
+		SkillIconImage->SetColorAndOpacity(CooldownTint);
+	}
+
 	UpdateCooldownDisplay();
 }
 
@@ -62,12 +82,13 @@ void UP1SkillIconWidget::ClearCooldown()
 	bOnCooldown = false;
 	RemainingCooldown = 0.f;
 
-	if (CooldownMID)
+	if (SkillIconImage)
 	{
-		CooldownMID->SetScalarParameterValue(TEXT("CooldownPercent"), 0.f);
+		SkillIconImage->SetColorAndOpacity(ReadyTint);
 	}
 	if (CooldownOverlay)
 	{
+		CooldownOverlay->SetPercent(0.f);
 		CooldownOverlay->SetVisibility(ESlateVisibility::Collapsed);
 	}
 	if (CooldownText)
@@ -80,15 +101,11 @@ void UP1SkillIconWidget::UpdateCooldownDisplay()
 {
 	const float Percent = RemainingCooldown / TotalCooldownTime;
 
-	if (CooldownMID)
+	if (CooldownOverlay)
 	{
-		// CooldownPercent: 1.0=풀쿨(전체 어둠), 0.0=준비
-		// 머터리얼에서 UV.Y < CooldownPercent 영역을 어둡게 처리하면 아래→위 해제
-		CooldownMID->SetScalarParameterValue(TEXT("CooldownPercent"), Percent);
-		if (CooldownOverlay)
-		{
-			CooldownOverlay->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-		}
+		// Percent: 1.0=풀쿨(전체 채움), 0.0=준비. FillType=BottomToTop이면 위쪽부터 순서대로 사라진다.
+		CooldownOverlay->SetPercent(Percent);
+		CooldownOverlay->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
 	if (CooldownText)
 	{

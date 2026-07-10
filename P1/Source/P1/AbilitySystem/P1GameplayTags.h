@@ -6,6 +6,9 @@
 
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_BasicAttack)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_BasicAttack)
+// 기본공격은 CooldownGameplayEffectClass를 쓰지 않는다(콤보를 GAS 쿨다운으로 막으면 안 되므로) —
+// 이 태그는 순수 UI용(스킬 아이콘의 "다음 공격까지 남은 시간" 표시)이며 발동 차단에는 전혀 관여하지 않는다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_BasicAttack)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Attacking)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Montage_BasicAttackHit)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_DamageMultiplier)
@@ -23,6 +26,11 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Damage_SourceMaxHealthPct)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Hero)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Boss)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Minion)
+
+// 무적 상태 — 전 어빌리티 공용(스테이시스/무적기 등). UP1AttributeSet이 Damage 처리 시 이 태그가 있으면 데미지를 무시한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Invulnerable)
+// 즉시 회복 GE의 SetByCaller 채널 — 최종 회복량(계수 적용까지 끝난 값)을 어빌리티가 C++에서 계산해 넣는다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Heal_Flat)
 
 // --- RMB: Assault The Gates (지면 조준 도약 스킬) ---
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_RMB)
@@ -53,3 +61,27 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_MakeWay)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_MakeWay)
 // 방어력 감소 디버프 식별 태그 (Make Way 등, 중첩 적용).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Debuff_ArmorShred)
+
+// --- R: Stone Forged Soul (스테이시스 상승 → 회복+슬로우 → 착지 범위 데미지 궁극기) ---
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_R)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_StoneForgedSoul)
+// 착지 몽타주 프레임 이벤트 — 서버 범위 피해 판정 + 비행 모드 해제 트리거 (RMB의 Land 이벤트와 동일한 패턴).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Montage_StoneForgedSoul_Crash)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_StoneForgedSoul)
+
+// --- Passive: Stoicism (다음 기본공격 무효화 + 잃은 체력 비례 재생/방어력) ---
+// 실제 입력 액션에는 바인딩하지 않는 "UI 슬롯 식별용" InputTag. 패시브는 입력으로 발동하지 않지만,
+// UP1OverlayWidgetController::BroadcastAbilityInfo()가 어빌리티→스킬아이콘 매핑에 InputTag를 재사용하므로
+// SkillIcon_Passive에 아이콘/쿨다운을 연결하려면 이 태그가 필요하다 — AbilityInputActions TMap에는 매핑하지 않는다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_Passive)
+// 어빌리티 자신의 Asset Tag를 OnGiveAbility에서 루즈 태그로도 ASC에 심어둔다 — AttributeSet이
+// "이 캐릭터가 애초에 Stoicism 디플렉트를 갖고 있는지"를 어빌리티 클래스 참조 없이(태그만으로) 판별하기 위함.
+// 실제 "지금 사용 가능한지"는 네이티브 쿨다운 태그(Cooldown.Ability.StoicismDeflect) 부재로 판단 — 새로 부여된
+// 어빌리티는 쿨다운 태그가 없는 상태로 시작하므로 별도 "준비완료" 태그 없이 자연스럽게 "처음엔 사용 가능"이 성립한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_StoicismDeflect)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_StoicismDeflect)
+// AttributeSet이 "디플렉트 발동됨"을 감지하면 이 이벤트를 보내 어빌리티가 자기 쿨다운을 커밋하게 한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_StoicismDeflect_Consumed)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_StoicismVitality)
+// 방어력 보너스 GE의 SetByCaller 채널 — 잃은 체력 비례 증폭까지 반영한 최종값을 어빌리티가 계산해 넣는다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_ArmorBonus_Flat)

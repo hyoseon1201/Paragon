@@ -5,11 +5,13 @@
 #include "CoreMinimal.h"
 #include "UI/Widget/P1UserWidget.h"
 #include "UI/Widget/P1SkillIconWidget.h"
+#include "GameplayTagContainer.h"
 #include "P1HUDWidget.generated.h"
 
 class UP1SegmentedBarWidget;
 class UP1SkillIconWidget;
 class UP1OverlayWidgetController;
+class UTexture2D;
 
 // 화면 하단 중앙 메인 HUD. WBP_HUD(BP)가 이 클래스를 상속하며,
 // BP에서 BindWidget 이름과 일치하는 위젯을 배치해야 한다.
@@ -65,6 +67,18 @@ private:
 	void OnMaxManaChanged(float NewValue);
 	UFUNCTION()
 	void OnManaRegenChanged(float NewValue);
+
+	// ---- 스킬 아이콘/쿨다운 ----
+	UFUNCTION()
+	void OnAbilityIconAssigned(FGameplayTag InputTag, UTexture2D* Icon);
+	UFUNCTION()
+	void OnCooldownStart(FGameplayTag InputTag, float Duration);
+	UFUNCTION()
+	void OnCooldownClear(FGameplayTag InputTag);
+
+	// InputTag.Ability.BasicAttack/RMB/Q/E/R → SkillIcon_LMB/RMB/Q/E/R 매핑.
+	// Passive/Flash는 InputTag가 없어(패시브는 입력 없이 발동, Flash는 미구현) 이 경로로 연결되지 않는다.
+	UP1SkillIconWidget* GetSkillIconForInputTag(const FGameplayTag& InputTag) const;
 
 	void RefreshHealthDisplay();
 	void RefreshManaDisplay();

@@ -44,6 +44,11 @@ void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float Da
 	const FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, GetAbilityLevel(), ContextHandle);
 	if (SpecHandle.IsValid())
 	{
+		// 이 데미지를 발생시킨 어빌리티의 Asset Tags(예: Ability.BasicAttack)를 스펙에 실어 보낸다.
+		// 이걸 안 하면(raw ASC MakeOutgoingSpec은 자동으로 안 실어줌) "이 데미지가 기본공격에서
+		// 왔는지" 같은 판별이 타겟 쪽(AttributeSet 등)에서 불가능해진다 — Stoicism 디플렉트 등에 필요.
+		SpecHandle.Data->CapturedSourceTags.GetSpecTags().AppendTags(GetAssetTags());
+
 		// ExecCalc_Damage가 이 채널들을 읽어 최종 데미지를 산출한다. GE가 SetByCaller를 참조하지 않으면 무시됨.
 		// Bonus 파라미터는 클래스 기본 계수 위에 이번 호출 한정으로 얹는다 (기본 0 = 평소와 동일).
 		SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_Damage_Flat, FlatDamage.GetValueAtLevel(GetAbilityLevel()) + BonusFlat);

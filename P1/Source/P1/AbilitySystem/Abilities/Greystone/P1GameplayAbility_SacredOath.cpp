@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AbilitySystem/Abilities/P1GameplayAbility_SacredOath.h"
+#include "AbilitySystem/Abilities/Greystone/P1GameplayAbility_SacredOath.h"
 #include "P1.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "GameplayEffect.h"

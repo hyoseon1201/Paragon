@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "AbilitySystem/Abilities/P1GameplayAbility_MeleeAttack_SacredOath.h"
+#include "AbilitySystem/Abilities/Greystone/P1GameplayAbility_MeleeAttack_SacredOath.h"
 #include "P1.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"
@@ -71,7 +71,9 @@ void UP1GameplayAbility_MeleeAttack_SacredOath::ApplyComboHitDamage(const TArray
 					const FGameplayEffectSpecHandle SlowSpec = ASC->MakeOutgoingSpec(SlowDebuffEffectClass, GetAbilityLevel(), Ctx);
 					if (SlowSpec.IsValid())
 					{
-						SlowSpec.Data->SetSetByCallerMagnitude(TAG_Data_DebuffMagnitude, SlowPercent);
+						// GE의 MovementSpeed Modifier는 Operation=Multiply라 "곱할 배수"를 기대한다.
+						// SlowPercent는 "감소율"(0.22=22% 감소)이므로 배수(1-SlowPercent)로 변환해서 보낸다.
+						SlowSpec.Data->SetSetByCallerMagnitude(TAG_Data_DebuffMagnitude, 1.0f - SlowPercent);
 						ASC->ApplyGameplayEffectSpecToTarget(*SlowSpec.Data.Get(), TargetASC);
 						UE_LOG(LogP1, Log, TEXT("[MeleeAttack_SacredOath] 슬로우 디버프 적용 — Target=%s SlowPercent=%.2f"),
 							*Enemy->GetName(), SlowPercent);

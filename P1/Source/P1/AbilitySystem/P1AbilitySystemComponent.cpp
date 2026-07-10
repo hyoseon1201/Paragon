@@ -2,7 +2,29 @@
 
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "Net/UnrealNetwork.h"
 #include "P1.h"
+
+void UP1AbilitySystemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UP1AbilitySystemComponent, bAbilitiesGiven);
+}
+
+void UP1AbilitySystemComponent::SetAbilitiesGiven()
+{
+	bAbilitiesGiven = true;
+	UE_LOG(LogP1, Log, TEXT("[ASC][AbilitiesGiven] SetAbilitiesGiven() 호출(서버/로컬) — Owner=%s | AbilitiesGivenDelegate 브로드캐스트"),
+		GetOwnerActor() ? *GetOwnerActor()->GetName() : TEXT("null"));
+	AbilitiesGivenDelegate.Broadcast();
+}
+
+void UP1AbilitySystemComponent::OnRep_AbilitiesGiven()
+{
+	UE_LOG(LogP1, Log, TEXT("[ASC][AbilitiesGiven] OnRep_AbilitiesGiven() 호출(리플리케이트 수신) — Owner=%s | AbilitiesGivenDelegate 브로드캐스트"),
+		GetOwnerActor() ? *GetOwnerActor()->GetName() : TEXT("null"));
+	AbilitiesGivenDelegate.Broadcast();
+}
 
 void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
 {

@@ -44,6 +44,35 @@ void UP1SegmentedBarWidget::NativeConstruct()
 	RefreshDisplay();
 }
 
+void UP1SegmentedBarWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	// 디자이너 미리보기에서도 즉시 반영되도록 PreConstruct에서 적용.
+	SetFillColor(FillColor);
+	SetBackgroundColor(BackgroundColor);
+}
+
+void UP1SegmentedBarWidget::SetFillColor(FLinearColor NewColor)
+{
+	FillColor = NewColor;
+	if (FillBar)
+	{
+		FillBar->SetFillColorAndOpacity(FillColor);
+	}
+}
+
+void UP1SegmentedBarWidget::SetBackgroundColor(FLinearColor NewColor)
+{
+	BackgroundColor = NewColor;
+	if (FillBar)
+	{
+		FProgressBarStyle Style = FillBar->GetWidgetStyle();
+		Style.BackgroundImage.TintColor = FSlateColor(BackgroundColor);
+		FillBar->SetWidgetStyle(Style);
+	}
+}
+
 void UP1SegmentedBarWidget::SetValues(float NewCurrent, float NewMax, float NewRegen)
 {
 	CurrentValue = FMath::Max(0.f, NewCurrent);

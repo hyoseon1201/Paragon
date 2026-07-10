@@ -40,9 +40,18 @@ void AP1PlayerState::OnRep_MyTeamId()
 {
 }
 
+void AP1PlayerState::SetCharacterLevel(int32 NewLevel)
+{
+	if (HasAuthority())
+	{
+		CharacterLevel = FMath::Max(1, NewLevel);
+	}
+}
+
 void AP1PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AP1PlayerState, MyTeamId);
+	DOREPLIFETIME(AP1PlayerState, CharacterLevel);
 }
