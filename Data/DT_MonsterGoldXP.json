@@ -1,0 +1,12 @@
+[
+  { "Name": "Wolves", "BaseGold": 80, "BaseExperience": 100, "RespawnSeconds": 120, "Notes": "1레벨(매치 시작) 기준값 — 실제 지급량 = BaseGold/BaseExperience × CT_MonsterRewardMultiplier[해당 몹의 현재 MonsterLevel]" },
+  { "Name": "Raptors", "BaseGold": 85, "BaseExperience": 105, "RespawnSeconds": 120 },
+  { "Name": "Gromp", "BaseGold": 80, "BaseExperience": 130, "RespawnSeconds": 120 },
+  { "Name": "Krugs", "BaseGold": 130, "BaseExperience": 160, "RespawnSeconds": 120 },
+  { "Name": "BlueBuff", "BaseGold": 100, "BaseExperience": 100, "RespawnSeconds": 300 },
+  { "Name": "RedBuff", "BaseGold": 100, "BaseExperience": 100, "RespawnSeconds": 300 },
+  { "Name": "ScuttleCrab", "BaseGold": 70, "BaseExperience": 100, "RespawnSeconds": 150 },
+  { "Name": "RiftHerald", "BaseGold": 100, "BaseExperience": 0, "RespawnSeconds": 0, "Notes": "던전 맵 레이아웃에 안 들어갈 수도 있는 대형 오브젝트 — 배치 여부 미정, 우선순위 낮음. 처치자 개인 골드, 팀 전체 별도 글로벌 골드는 미구현" },
+  { "Name": "ElementalDrake", "BaseGold": 25, "BaseExperience": 0, "RespawnSeconds": 300, "Notes": "RiftHerald와 동일 — 배치 여부 미정" },
+  { "Name": "BaronNashor", "BaseGold": 300, "BaseExperience": 0, "RespawnSeconds": 0, "Notes": "RiftHerald와 동일 — 배치 여부 미정" }
+]

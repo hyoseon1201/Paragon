@@ -22,6 +22,9 @@ UP1GameplayAbility::UP1GameplayAbility()
 	// 반복 설정할 필요 없이 베이스에서 한 번에 처리.
 	ActivationOwnedTags.AddTag(TAG_State_Attacking);
 	ActivationBlockedTags.AddTag(TAG_State_Attacking);
+
+	// 사망 중엔 어떤 어빌리티도 발동 불가 (State.Dead GE가 자연 만료되면 곧 리스폰).
+	ActivationBlockedTags.AddTag(TAG_State_Dead);
 }
 
 AP1CharacterBase* UP1GameplayAbility::GetP1CharacterFromActorInfo() const

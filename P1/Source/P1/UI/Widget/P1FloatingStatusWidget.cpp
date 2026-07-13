@@ -2,8 +2,8 @@
 
 #include "UI/Widget/P1FloatingStatusWidget.h"
 #include "UI/WidgetController/P1FloatingStatusWidgetController.h"
+#include "UI/Widget/P1SegmentedBarWidget.h"
 #include "Components/TextBlock.h"
-#include "Components/ProgressBar.h"
 
 void UP1FloatingStatusWidget::OnWidgetControllerSet()
 {
@@ -15,6 +15,14 @@ void UP1FloatingStatusWidget::OnWidgetControllerSet()
 	Controller->OnMaxManaChanged.AddDynamic(this, &UP1FloatingStatusWidget::OnMaxManaChanged);
 }
 
+void UP1FloatingStatusWidget::SetCharacterName(const FText& NewName)
+{
+	if (NameText)
+	{
+		NameText->SetText(NewName);
+	}
+}
+
 void UP1FloatingStatusWidget::OnHealthChanged(float NewValue)   { CachedHealth = NewValue;    RefreshBars(); }
 void UP1FloatingStatusWidget::OnMaxHealthChanged(float NewValue) { CachedMaxHealth = NewValue; RefreshBars(); }
 void UP1FloatingStatusWidget::OnManaChanged(float NewValue)      { CachedMana = NewValue;      RefreshBars(); }
@@ -24,10 +32,10 @@ void UP1FloatingStatusWidget::RefreshBars()
 {
 	if (HPBar)
 	{
-		HPBar->SetPercent(CachedMaxHealth > 0.f ? CachedHealth / CachedMaxHealth : 0.f);
+		HPBar->SetValues(CachedHealth, CachedMaxHealth);
 	}
 	if (MPBar)
 	{
-		MPBar->SetPercent(CachedMaxMana > 0.f ? CachedMana / CachedMaxMana : 0.f);
+		MPBar->SetValues(CachedMana, CachedMaxMana);
 	}
 }

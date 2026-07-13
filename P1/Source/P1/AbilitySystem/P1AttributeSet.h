@@ -7,6 +7,8 @@
 #include "AbilitySystemComponent.h"
 #include "P1AttributeSet.generated.h"
 
+class AP1PlayerState;
+
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
@@ -107,6 +109,16 @@ public:
 	FGameplayAttributeData MovementSpeed;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, MovementSpeed)
 
+	// --- Progression (레벨업/킬·어시스트 보상) ---
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Gold, Category = "Attributes|Progression")
+	FGameplayAttributeData Gold;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, Gold)
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Experience, Category = "Attributes|Progression")
+	FGameplayAttributeData Experience;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, Experience)
+
 	// --- Meta (transient, 비복제) ---
 	// ExecCalc_Damage가 최종 데미지를 여기에 누적하고, PostGameplayEffectExecute에서 Health로 변환한다.
 	// 서버에서만 계산되므로 복제하지 않는다.
@@ -159,9 +171,24 @@ protected:
 	virtual void OnRep_AbilityHaste(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_MovementSpeed(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_Gold(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_Experience(const FGameplayAttributeData& OldValue);
 
 private:
 	void ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const;
+
+	// 최근 이 캐릭터에게 데미지를 입힌 적 플레이어스테이트 → 마지막 피격 시각(초, GetTimeSeconds 기준).
+	// 어시스트 판정용 서버 전용 북키핑 — TWeakObjectPtr라 GC 안전하고 UPROPERTY/복제가 필요 없다.
+	TMap<TWeakObjectPtr<AP1PlayerState>, float> RecentDamageContributors;
+
+	// 데미지가 실제로 적용될 때(무적/디플렉트로 무효화되지 않은 경우) 소스를 기록해 어시스트 윈도우를 갱신한다.
+	void RecordDamageContribution(const FGameplayEffectModCallbackData& Data);
+
+	// 사망 확정 시 호출 — 킬러 판별, 최근 10초 내 딜 넣은 플레이어 전원에게 어시스트 지급,
+	// Kills/Deaths/Assists/KillStreak 갱신 후 골드+경험치 보상 GE를 킬러/어시스터 각자에게 적용한다.
+	void HandleKillRewards(const FGameplayEffectModCallbackData& Data);
 };
 
 #undef ATTRIBUTE_ACCESSORS

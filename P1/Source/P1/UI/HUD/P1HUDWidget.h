@@ -12,6 +12,7 @@ class UP1SegmentedBarWidget;
 class UP1SkillIconWidget;
 class UP1OverlayWidgetController;
 class UTexture2D;
+class UTextBlock;
 
 // 화면 하단 중앙 메인 HUD. WBP_HUD(BP)가 이 클래스를 상속하며,
 // BP에서 BindWidget 이름과 일치하는 위젯을 배치해야 한다.
@@ -53,6 +54,19 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UP1SkillIconWidget> SkillIcon_Flash;
 
+	// ---- 좌하단 플레이어 정보(레벨/KDA/경험치/골드) (Optional) ----
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> LevelText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> KDAText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> GoldText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UP1SegmentedBarWidget> ExperienceBar;
+
 private:
 	// 컨트롤러 델리게이트 핸들러 — float 직접 수신
 	UFUNCTION()
@@ -75,6 +89,16 @@ private:
 	void OnCooldownStart(FGameplayTag InputTag, float Duration);
 	UFUNCTION()
 	void OnCooldownClear(FGameplayTag InputTag);
+
+	// ---- 좌하단 플레이어 정보 ----
+	UFUNCTION()
+	void OnLevelChanged(int32 NewLevel);
+	UFUNCTION()
+	void OnKDAChanged(int32 Kills, int32 Deaths, int32 Assists);
+	UFUNCTION()
+	void OnExperienceChanged(float CurrentXP, float XPRequiredForNextLevel);
+	UFUNCTION()
+	void OnGoldChanged(float NewValue);
 
 	// InputTag.Ability.BasicAttack/RMB/Q/E/R → SkillIcon_LMB/RMB/Q/E/R 매핑.
 	// Passive/Flash는 InputTag가 없어(패시브는 입력 없이 발동, Flash는 미구현) 이 경로로 연결되지 않는다.

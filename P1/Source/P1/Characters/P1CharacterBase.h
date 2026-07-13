@@ -10,7 +10,7 @@
 #include "P1CharacterBase.generated.h"
 
 class UAbilitySystemComponent;
-class UWidgetComponent;
+class UP1FloatingWidgetComponent;
 class UP1FloatingStatusWidget;
 class UP1FloatingStatusWidgetController;
 class UMaterialInterface;
@@ -74,9 +74,12 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
 
-	// 머리 위 월드스페이스 HP/MP 바. BP에서 WidgetClass를 WBP_FloatingStatus로 설정.
+	// 머리 위 HP/MP 바. BP에서 WidgetClass를 WBP_FloatingStatus로 설정.
+	// Space=Screen이라 3D 메시가 아니라 화면에 직접 그려지는 2D 오버레이라서, 캐릭터가 회전해도
+	// 절대 옆모습(안 보임)이 되지 않는다 — 3D 앵커 위치만 매 프레임 화면 좌표로 재투영될 뿐.
+	// UP1FloatingWidgetComponent라 카메라 거리에 비례해 크기도 함께 스케일된다.
 	UPROPERTY(VisibleAnywhere, Category = "UI")
-	TObjectPtr<UWidgetComponent> FloatingStatusComponent;
+	TObjectPtr<UP1FloatingWidgetComponent> FloatingStatusComponent;
 
 	// FloatingStatusWidget에 데이터를 공급하는 per-character 컨트롤러.
 	UPROPERTY()

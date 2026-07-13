@@ -47,6 +47,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Appearance")
 	FLinearColor BackgroundColor = FLinearColor(0.f, 0.f, 0.f, 0.5f);
 
+	// false면 ValueText/RegenText를 숨긴다 — 같은 WBP를 HUD(텍스트 있음)와 머리 위 위젯(텍스트 없음)
+	// 양쪽에서 인스턴스별로 다르게 재사용하기 위함(둘 다 EditAnywhere라 배치할 때 인스턴스마다 값을 다르게 넣을 수 있음).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Appearance")
+	bool bShowLabels = true;
+
 protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UProgressBar> FillBar;

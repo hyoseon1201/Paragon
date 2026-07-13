@@ -19,7 +19,19 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Boss, "Character.Type.Boss", "
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Minion, "Character.Type.Minion", "일반 미니언/졸개")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Invulnerable, "State.Invulnerable", "무적 상태 — UP1AttributeSet이 Damage 처리 시 이 태그가 있으면 데미지를 무시(0으로 처리)한다")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Dead, "State.Dead", "사망 상태 GE가 부여하는 태그 — 전 어빌리티 ActivationBlockedTags에 포함, GE 자연 만료 시점이 리스폰 시점")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_Died, "Event.Character.Died", "AttributeSet이 Health<=0을 감지하면 보내는 이벤트 — 캐릭터가 받아 State.Dead GE를 자신에게 적용")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_RespawnDelay, "Data.RespawnDelay", "사망 GE의 Duration(리스폰 대기시간) SetByCaller 채널")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_Death_Impact, "Event.Montage.Death.Impact", "DeathMontage의 착지 프레임 이벤트 — 이 시점에 래그돌로 전환")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Heal_Flat, "Data.Heal.Flat", "즉시 회복 GE의 SetByCaller 채널 — 계수 적용까지 끝난 최종 회복량")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Mana_Flat, "Data.Mana.Flat", "즉시 마나 회복 GE의 SetByCaller 채널")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Gold_Flat, "Data.Gold.Flat", "골드 보상 GE의 SetByCaller 채널")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Experience_Flat, "Data.Experience.Flat", "경험치 보상 GE의 SetByCaller 채널")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_KillStreak, "Data.KillStreak", "킬 보상 MMC가 읽는 피해자의 연속킬 수 — 현상금 보정에 사용")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_TimeSinceLastDeath, "Data.TimeSinceLastDeath", "킬 보상 MMC가 읽는 피해자의 마지막 사망 후 경과 시간(초) — 현상금 보정에 사용")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_InputTag_Ability_RMB, "InputTag.Ability.RMB", "우클릭 어빌리티 입력 태그 (Assault The Gates)")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_AssaultTheGates, "Ability.AssaultTheGates", "Assault The Gates 어빌리티 식별 태그")

@@ -5,6 +5,7 @@
 #include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayAbility.h"
+#include "Player/P1PlayerState.h"
 #include "Engine/Texture2D.h"
 #include "P1.h"
 
@@ -17,6 +18,14 @@ void UP1OverlayWidgetController::BroadcastInitialValues()
 	OnManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFound));
 	OnMaxManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxManaAttribute(), bFound));
 	OnManaRegenChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetManaRegenAttribute(), bFound));
+	OnGoldChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetGoldAttribute(), bFound));
+	BroadcastExperience();
+
+	if (const AP1PlayerState* P1PS = Cast<AP1PlayerState>(PlayerState))
+	{
+		OnLevelChanged.Broadcast(P1PS->GetCharacterLevel());
+		OnKDAChanged.Broadcast(P1PS->GetKills(), P1PS->GetDeaths(), P1PS->GetAssists());
+	}
 
 	// AbilitiesGiven 여부에 따라 즉시 브로드캐스트할지는 여기서(위젯이 이미 OnWidgetControllerSet에서
 	// 리스너를 건 뒤 호출되는 지점) 판단해야 한다. BindCallbacksToDependencies는 위젯 생성보다 먼저
@@ -46,6 +55,16 @@ void UP1OverlayWidgetController::BindCallbacksToDependencies()
 		.AddUObject(this, &UP1OverlayWidgetController::OnMaxManaAttributeChanged);
 	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetManaRegenAttribute())
 		.AddUObject(this, &UP1OverlayWidgetController::OnManaRegenAttributeChanged);
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetGoldAttribute())
+		.AddUObject(this, &UP1OverlayWidgetController::OnGoldAttributeChanged);
+	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetExperienceAttribute())
+		.AddUObject(this, &UP1OverlayWidgetController::OnExperienceAttributeChanged);
+
+	if (AP1PlayerState* P1PS = Cast<AP1PlayerState>(PlayerState))
+	{
+		P1PS->OnCharacterLevelChangedNative.AddUObject(this, &UP1OverlayWidgetController::OnCharacterLevelChanged);
+		P1PS->OnKDAChangedNative.AddUObject(this, &UP1OverlayWidgetController::OnKDAChanged_Internal);
+	}
 
 	if (UP1AbilitySystemComponent* P1ASC = Cast<UP1AbilitySystemComponent>(AbilitySystemComponent))
 	{
@@ -140,3 +159,26 @@ void UP1OverlayWidgetController::OnHealthRegenAttributeChanged(const FOnAttribut
 void UP1OverlayWidgetController::OnManaAttributeChanged(const FOnAttributeChangeData& Data)       { OnManaChanged.Broadcast(Data.NewValue); }
 void UP1OverlayWidgetController::OnMaxManaAttributeChanged(const FOnAttributeChangeData& Data)    { OnMaxManaChanged.Broadcast(Data.NewValue); }
 void UP1OverlayWidgetController::OnManaRegenAttributeChanged(const FOnAttributeChangeData& Data)  { OnManaRegenChanged.Broadcast(Data.NewValue); }
+void UP1OverlayWidgetController::OnGoldAttributeChanged(const FOnAttributeChangeData& Data)       { OnGoldChanged.Broadcast(Data.NewValue); }
+void UP1OverlayWidgetController::OnExperienceAttributeChanged(const FOnAttributeChangeData& Data) { BroadcastExperience(); }
+
+void UP1OverlayWidgetController::OnCharacterLevelChanged(int32 NewLevel)
+{
+	OnLevelChanged.Broadcast(NewLevel);
+	// CharacterLevel이 바뀌면 XPRequiredForNextLevel도 바뀌므로 XP 바를 새 상한으로 다시 그려야 한다.
+	BroadcastExperience();
+}
+
+void UP1OverlayWidgetController::OnKDAChanged_Internal(int32 Kills, int32 Deaths, int32 Assists)
+{
+	OnKDAChanged.Broadcast(Kills, Deaths, Assists);
+}
+
+void UP1OverlayWidgetController::BroadcastExperience()
+{
+	bool bFound = false;
+	const float CurrentXP = AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetExperienceAttribute(), bFound);
+	const AP1PlayerState* P1PS = Cast<AP1PlayerState>(PlayerState);
+	const float XPRequired = P1PS ? P1PS->GetXPRequiredForNextLevel() : 0.0f;
+	OnExperienceChanged.Broadcast(CurrentXP, XPRequired);
+}

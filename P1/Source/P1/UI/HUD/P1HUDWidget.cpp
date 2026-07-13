@@ -4,6 +4,7 @@
 #include "UI/WidgetController/P1OverlayWidgetController.h"
 #include "UI/Widget/P1SegmentedBarWidget.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
 #include "P1.h"
 
@@ -21,6 +22,11 @@ void UP1HUDWidget::OnWidgetControllerSet()
 	Controller->OnAbilityIconAssigned.AddDynamic(this, &UP1HUDWidget::OnAbilityIconAssigned);
 	Controller->OnCooldownStart.AddDynamic(this, &UP1HUDWidget::OnCooldownStart);
 	Controller->OnCooldownClear.AddDynamic(this, &UP1HUDWidget::OnCooldownClear);
+
+	Controller->OnLevelChanged.AddDynamic(this, &UP1HUDWidget::OnLevelChanged);
+	Controller->OnKDAChanged.AddDynamic(this, &UP1HUDWidget::OnKDAChanged);
+	Controller->OnExperienceChanged.AddDynamic(this, &UP1HUDWidget::OnExperienceChanged);
+	Controller->OnGoldChanged.AddDynamic(this, &UP1HUDWidget::OnGoldChanged);
 
 	UE_LOG(LogP1, Log, TEXT("[HUDWidget][AbilityIcon] OnWidgetControllerSet — OnAbilityIconAssigned 등 3개 델리게이트 구독 완료. SkillIcon 바인딩: LMB=%s RMB=%s Q=%s E=%s R=%s Passive=%s"),
 		SkillIcon_LMB ? TEXT("O") : TEXT("X(미배치)"),
@@ -99,5 +105,38 @@ void UP1HUDWidget::RefreshManaDisplay()
 	if (ManaBar)
 	{
 		ManaBar->SetValues(CachedMana, CachedMaxMana, CachedManaRegen);
+	}
+}
+
+void UP1HUDWidget::OnLevelChanged(int32 NewLevel)
+{
+	if (LevelText)
+	{
+		LevelText->SetText(FText::FromString(FString::Printf(TEXT("Lv. %d"), NewLevel)));
+	}
+}
+
+void UP1HUDWidget::OnKDAChanged(int32 Kills, int32 Deaths, int32 Assists)
+{
+	if (KDAText)
+	{
+		KDAText->SetText(FText::FromString(FString::Printf(TEXT("%d / %d / %d"), Kills, Deaths, Assists)));
+	}
+}
+
+void UP1HUDWidget::OnExperienceChanged(float CurrentXP, float XPRequiredForNextLevel)
+{
+	if (ExperienceBar)
+	{
+		// XPRequired=0(테이블 미설정 또는 만렙)이면 SegmentedBar가 0으로 나누지 않도록 1로 클램프.
+		ExperienceBar->SetValues(CurrentXP, FMath::Max(XPRequiredForNextLevel, 1.0f));
+	}
+}
+
+void UP1HUDWidget::OnGoldChanged(float NewValue)
+{
+	if (GoldText)
+	{
+		GoldText->SetText(FText::FromString(FString::Printf(TEXT("%d G"), FMath::RoundToInt(NewValue))));
 	}
 }

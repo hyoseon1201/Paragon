@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/P1CharacterBase.h"
-#include "Components/WidgetComponent.h"
+#include "UI/P1FloatingWidgetComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Particles/ParticleSystem.h"
@@ -11,10 +11,10 @@
 
 AP1CharacterBase::AP1CharacterBase()
 {
-	FloatingStatusComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("FloatingStatusComponent"));
+	FloatingStatusComponent = CreateDefaultSubobject<UP1FloatingWidgetComponent>(TEXT("FloatingStatusComponent"));
 	FloatingStatusComponent->SetupAttachment(GetRootComponent());
 	FloatingStatusComponent->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
-	FloatingStatusComponent->SetWidgetSpace(EWidgetSpace::World);
+	FloatingStatusComponent->SetWidgetSpace(EWidgetSpace::Screen);
 	FloatingStatusComponent->SetDrawSize(FVector2D(180.f, 50.f));
 	FloatingStatusComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 

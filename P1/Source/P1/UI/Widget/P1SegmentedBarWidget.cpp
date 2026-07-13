@@ -51,6 +51,16 @@ void UP1SegmentedBarWidget::NativePreConstruct()
 	// 디자이너 미리보기에서도 즉시 반영되도록 PreConstruct에서 적용.
 	SetFillColor(FillColor);
 	SetBackgroundColor(BackgroundColor);
+
+	const ESlateVisibility LabelVisibility = bShowLabels ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed;
+	if (ValueText)
+	{
+		ValueText->SetVisibility(LabelVisibility);
+	}
+	if (RegenText)
+	{
+		RegenText->SetVisibility(LabelVisibility);
+	}
 }
 
 void UP1SegmentedBarWidget::SetFillColor(FLinearColor NewColor)

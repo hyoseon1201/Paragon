@@ -21,6 +21,16 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCooldownStartSignature, FGamepla
 // 쿨다운 해제.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCooldownClearSignature, FGameplayTag, InputTag);
 
+// 캐릭터 레벨 변경.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelChangedSignature, int32, NewLevel);
+
+// Kills/Deaths/Assists — 항상 세 값을 함께 표시하므로 하나로 묶어 브로드캐스트.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnKDAChangedSignature, int32, Kills, int32, Deaths, int32, Assists);
+
+// 경험치 — CurrentXP/XPRequired 쌍(바 채우기용). CharacterLevel이 바뀌면 XPRequired도 바뀌므로
+// Experience 값 자체가 안 바뀌어도 재브로드캐스트가 필요할 수 있다(레벨업 순간).
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExperienceChangedSignature, float, CurrentXP, float, XPRequiredForNextLevel);
+
 // 인게임 HUD(HP·MP·리젠·스킬슬롯 등)용 WidgetController.
 // ASC 속성 변경을 구독하고 위젯에 브로드캐스트한다.
 UCLASS(BlueprintType)
@@ -62,6 +72,19 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events|Ability")
 	FOnCooldownClearSignature OnCooldownClear;
 
+	// ---- Progression (레벨/KDA/경험치/골드) ----
+	UPROPERTY(BlueprintAssignable, Category = "Events|Progression")
+	FOnLevelChangedSignature OnLevelChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events|Progression")
+	FOnKDAChangedSignature OnKDAChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events|Progression")
+	FOnExperienceChangedSignature OnExperienceChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events|Progression")
+	FOnAttributeChangedSignature OnGoldChanged;
+
 private:
 	void OnHealthAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnMaxHealthAttributeChanged(const FOnAttributeChangeData& Data);
@@ -69,6 +92,16 @@ private:
 	void OnManaAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnMaxManaAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnManaRegenAttributeChanged(const FOnAttributeChangeData& Data);
+	void OnGoldAttributeChanged(const FOnAttributeChangeData& Data);
+	void OnExperienceAttributeChanged(const FOnAttributeChangeData& Data);
+
+	// AP1PlayerState의 네이티브 델리게이트 핸들러 (레벨/KDA — GAS 어트리뷰트가 아닌 plain int)
+	void OnCharacterLevelChanged(int32 NewLevel);
+	void OnKDAChanged_Internal(int32 Kills, int32 Deaths, int32 Assists);
+
+	// 현재 Experience/XPRequired를 함께 브로드캐스트하는 공용 헬퍼 — Experience 변경, 레벨 변경(=XPRequired 변경)
+	// 양쪽에서 호출된다.
+	void BroadcastExperience();
 
 	// ASC->AreAbilitiesGiven()이 true가 된 시점(즉시 또는 AbilitiesGivenDelegate 경유)에 호출된다.
 	// GetActivatableAbilities()를 순회해 아이콘을 1회 배정하고, 어빌리티마다 자기 쿨다운 태그의

@@ -29,8 +29,32 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Minion)
 
 // 무적 상태 — 전 어빌리티 공용(스테이시스/무적기 등). UP1AttributeSet이 Damage 처리 시 이 태그가 있으면 데미지를 무시한다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Invulnerable)
+
+// --- 사망/리스폰 (전 캐릭터 공용) ---
+// Health<=0 감지 시 UP1AttributeSet이 부여하는 Duration GE의 태그 — 전 어빌리티 공통 ActivationBlockedTags에도
+// 걸려있어 사망 중엔 어떤 어빌리티도 발동 불가. GE 자체가 자연 만료되는 시점이 곧 리스폰 시점이다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Dead)
+// AttributeSet이 Health<=0을 감지하면 보내는 GameplayEvent — AP1HeroCharacter가 이 이벤트를 받아
+// State.Dead GE를 자신에게 적용한다(AttributeSet은 캐릭터 클래스를 몰라야 하므로 GE 적용 자체는 위임).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Character_Died)
+// 사망 GE의 Duration(리스폰 대기시간) SetByCaller 채널.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_RespawnDelay)
+// DeathMontage의 "착지/충격" 프레임에 UP1AnimNotify_SendGameplayEvent로 배치 — 이 시점에
+// AP1HeroCharacter가 스켈레탈 메시를 물리 시뮬레이션(래그돌)으로 전환한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Montage_Death_Impact)
+
 // 즉시 회복 GE의 SetByCaller 채널 — 최종 회복량(계수 적용까지 끝난 값)을 어빌리티가 C++에서 계산해 넣는다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Heal_Flat)
+// 즉시 마나 회복 GE의 SetByCaller 채널 — Data.Heal.Flat과 동일한 패턴, Mana 대상.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Mana_Flat)
+
+// --- 성장/보상 (레벨업, 킬/어시스트) ---
+// 골드/경험치 보상 GE의 SetByCaller 채널 — 킬/어시스트 보상 지급 시 AttributeSet이 계산해 넣는다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Gold_Flat)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Experience_Flat)
+// 킬 보상 GE 전용 — UP1MMC_GoldKillBounty가 이 두 채널을 SetByCaller로 읽어 현상금(연속킬/생존시간 보정)을 계산한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_KillStreak)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_TimeSinceLastDeath)
 
 // --- RMB: Assault The Gates (지면 조준 도약 스킬) ---
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_RMB)
