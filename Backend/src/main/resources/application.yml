@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: p1-backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/p1?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: p1
+    password: p1password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080
+
+# 로그인/매칭 API 전용 설정 — Spring Security 없이 직접 구현하는 JWT + 매치메이킹.
+jwt:
+  # 데모/로컬 홈서버 전용 시크릿. 실제 배포 전 반드시 환경변수 등으로 교체할 것.
+  secret: "p1-backend-dev-secret-change-before-real-deploy-32bytes+"
+  expiration-ms: 3600000 # 1시간
+
+match:
+  required-players: 2
+  server-address: "127.0.0.1:7777"
