@@ -53,6 +53,17 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_RespawnDelay)
 // AP1HeroCharacter가 스켈레탈 메시를 물리 시뮬레이션(래그돌)으로 전환한다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Montage_Death_Impact)
 
+// --- 피격 리액션 (전 캐릭터 공용) ---
+// AttributeSet이 데미지를 받고도 생존(Health>0)했음을 감지하면 보내는 GameplayEvent — 이 이벤트 자체는
+// 서버에서만 발화된다(Death와 동일한 이유). AP1HeroCharacter가 받아 HitReactEffectClass(매우 짧은
+// Duration GE)를 자신에게 적용 — 그 GE가 부여하는 State.HitReacting 태그가 실제로 리플리케이트되므로,
+// 원격 클라이언트를 포함한 전 클라이언트가 태그 변경 이벤트로 몽타주를 재생할 수 있다(순수 GameplayEvent를
+// 직접 재생 트리거로 쓰면 서버/호스트에서만 보이고 다른 플레이어 화면엔 안 보임 — 코스메틱 리플리케이션 컨벤션 참고).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Character_HitReact)
+// HitReactEffectClass가 부여하는 신호용 태그 — 값 자체엔 의미 없고, 카운트가 0→양수로 바뀌는 순간만
+// 감지해 리액션 몽타주를 재생한다(제거 시점엔 아무것도 안 함, 몽타주는 짧은 원샷이라 스스로 끝남).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_HitReacting)
+
 // 즉시 회복 GE의 SetByCaller 채널 — 최종 회복량(계수 적용까지 끝난 값)을 어빌리티가 C++에서 계산해 넣는다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Heal_Flat)
 // 즉시 마나 회복 GE의 SetByCaller 채널 — Data.Heal.Flat과 동일한 패턴, Mana 대상.
@@ -69,8 +80,14 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_TimeSinceLastDeath)
 // --- RMB: Assault The Gates (지면 조준 도약 스킬) ---
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_RMB)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_AssaultTheGates)
-// 지면 조준 중 상태. 이 태그가 있으면 ASC 입력 라우팅이 LMB=확정, RMB=취소로 리라우팅하고 나머지 어빌리티는 차단.
+// 지면 조준 중 상태. 이 태그가 있으면 ASC 입력 라우팅이 LMB=확정, InputTag.Cancel(F)=취소로 리라우팅하고
+// 나머지 어빌리티는 차단. 취소를 "같은 스킬키 재입력"이 아니라 전용 키로 분리한 이유 — 홀드해서 조준하고
+// 키를 떼야 발사하는 스킬은 "떼기"가 이미 확정 동작이라 같은 키로 취소를 표현할 방법이 없기 때문(상세
+// 배경은 UP1AbilitySystemComponent::AbilityInputTagPressed 주석 참고).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_TargetingAbility)
+// 지면조준/타게팅 어빌리티 전용 취소 입력 태그 — 실제 입력 액션(F 키 등)은 AbilityInputActions TMap에서
+// 이 태그와 매핑한다. 어떤 스킬 키로 조준을 시작했든(RMB/Q/E 등) 항상 이 하나로 취소한다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_InputTag_Ability_Cancel)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Montage_AssaultTheGates_Land)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_AssaultTheGates)
 // 이동속도 버프 식별 태그 (RMB 영웅/보스 적중 보상 등).
@@ -119,3 +136,17 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_StoicismDeflect_Consumed)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_StoicismVitality)
 // 방어력 보너스 GE의 SetByCaller 채널 — 잃은 체력 비례 증폭까지 반영한 최종값을 어빌리티가 계산해 넣는다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_ArmorBonus_Flat)
+
+// --- Dekker Q: Photon Disruptor (관통 드론 빔) ---
+// InputTag.Ability.Q는 그레이스톤의 Make Way와 공유(영웅마다 이 슬롯엔 자신의 어빌리티 하나만 등록,
+// 같은 입력 태그를 두 어빌리티가 동시에 두고 경쟁하지 않음 — MeleeAttack/RangedAttack과 동일한 패턴).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_PhotonDisruptor)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_PhotonDisruptor)
+
+// --- Dekker RMB: Stasis Bomb (홀드 조준 → 튕기는 폭탄) ---
+// InputTag.Ability.RMB는 그레이스톤의 Assault The Gates와 공유(위와 동일한 이유 — 영웅당 이 슬롯에
+// 자신의 어빌리티 하나만 등록). Assault The Gates와 달리 지면 장판이 아니라 "홀드 조준 → 릴리즈 발사"
+// 방식이라, State.TargetingAbility 태그는 그대로 재사용하되 확정 트리거가 LMB가 아니라 조준을 시작한
+// 스킬 자신(RMB)의 release다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Ability_StasisBomb)
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_StasisBomb)

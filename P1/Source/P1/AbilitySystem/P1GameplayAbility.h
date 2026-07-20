@@ -66,6 +66,11 @@ public:
 		const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
 		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
+	// 베이스 UGameplayAbility::ActivationOwnedTags는 protected라 외부(캐릭터 클래스 등)에서 "이 어빌리티가
+	// 활성 상태일 때 특정 태그를 소유하는지"를 확인할 방법이 없다 — 스턴 등으로 진행 중인 어빌리티를 선별
+	// 취소해야 하는 곳(AP1HeroCharacter::CancelActiveAbilitiesOnStun)에 필요해 얇은 접근자로 노출한다.
+	bool OwnsActivationTag(const FGameplayTag& Tag) const { return ActivationOwnedTags.HasTag(Tag); }
+
 protected:
 	AP1CharacterBase* GetP1CharacterFromActorInfo() const;
 	AP1PlayerController* GetP1PlayerControllerFromActorInfo() const;

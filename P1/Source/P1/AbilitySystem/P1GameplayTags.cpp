@@ -28,6 +28,9 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_Died, "Event.Character.Died",
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_RespawnDelay, "Data.RespawnDelay", "사망 GE의 Duration(리스폰 대기시간) SetByCaller 채널")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_Death_Impact, "Event.Montage.Death.Impact", "DeathMontage의 착지 프레임 이벤트 — 이 시점에 래그돌로 전환")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_HitReact, "Event.Character.HitReact", "AttributeSet이 데미지를 받고도 생존했음을 감지하면 보내는 이벤트 — 캐릭터가 받아 HitReactEffectClass를 자신에게 적용")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_HitReacting, "State.HitReacting", "피격 리액션 신호용 태그 — HitReactEffectClass가 부여, 카운트 0→양수 전환 시점에 리액션 몽타주 재생")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Heal_Flat, "Data.Heal.Flat", "즉시 회복 GE의 SetByCaller 채널 — 계수 적용까지 끝난 최종 회복량")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Mana_Flat, "Data.Mana.Flat", "즉시 마나 회복 GE의 SetByCaller 채널")
 
@@ -43,6 +46,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_AssaultTheGates_Land, "Event.Mo
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_AssaultTheGates, "Cooldown.Ability.AssaultTheGates", "Assault The Gates 쿨다운 GE가 부여하는 태그")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Buff_MovementSpeed, "Buff.MovementSpeed", "이동속도 증가 버프 식별 태그")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_CooldownDuration, "Data.CooldownDuration", "쿨다운 GE의 SetByCaller 지속시간 채널 — 어빌리티가 동적으로 쿨다운 길이 지정")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_InputTag_Ability_Cancel, "InputTag.Ability.Cancel", "조준/타게팅 어빌리티 전용 취소 입력 태그(F 키 등) — 어떤 스킬로 조준을 시작했든 공통으로 취소에 사용")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_InputTag_Ability_E, "InputTag.Ability.E", "E 어빌리티 입력 태그 (Sacred Oath)")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_SacredOath, "Ability.SacredOath", "Sacred Oath 어빌리티 식별 태그")
@@ -67,3 +71,9 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_StoicismDeflect, "Cooldown.A
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_StoicismDeflect_Consumed, "Event.StoicismDeflect.Consumed", "AttributeSet이 디플렉트 발동을 감지했을 때 보내는 이벤트 — 어빌리티가 자기 쿨다운을 커밋하도록 트리거")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_StoicismVitality, "Ability.StoicismVitality", "Stoicism 패시브의 재생+방어력 어빌리티 식별 태그")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_ArmorBonus_Flat, "Data.ArmorBonus.Flat", "방어력 보너스 GE의 SetByCaller 채널 — 잃은 체력 비례 증폭까지 반영한 최종값")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_PhotonDisruptor, "Ability.PhotonDisruptor", "Photon Disruptor(Dekker Q) 어빌리티 식별 태그")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_PhotonDisruptor, "Cooldown.Ability.PhotonDisruptor", "Photon Disruptor 쿨다운 GE가 부여하는 태그")
+
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_StasisBomb, "Ability.StasisBomb", "Stasis Bomb(Dekker RMB) 어빌리티 식별 태그")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_StasisBomb, "Cooldown.Ability.StasisBomb", "Stasis Bomb 쿨다운 GE가 부여하는 태그")

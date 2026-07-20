@@ -49,6 +49,12 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayParticleEffect(UParticleSystem* ParticleTemplate, FName SocketName);
 
+	// 위와 동일한 1회성 이펙트지만, 소켓이 아니라 캐릭터와 무관한 임의의 월드 좌표에 재생한다 — 예를 들어
+	// 캐릭터 주변이 아니라 스킬 궤적을 따라 이동하는 지점(지면 블래스트 등)에 재생해야 하는 경우.
+	// Scale은 파티클 에셋 자체를 수정하지 않고 호출부(어빌리티 등)에서 크기를 조절하기 위함 — 기본값 (1,1,1).
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayParticleEffectAtLocation(UParticleSystem* ParticleTemplate, FVector Location, FRotator Rotation, FVector Scale);
+
 	// 위 MulticastPlayParticleEffect와 달리 자동 파괴되지 않고 소켓에 계속 붙어있는 지속 이펙트를
 	// 시작한다 (예: 버프 지속 동안 유지되는 무기 궤적) — 반환값 없이 내부에서 컴포넌트를 보관하고,
 	// 이미 재생 중인 게 있으면 먼저 정리한 뒤 새로 시작한다.
@@ -58,6 +64,13 @@ public:
 	// MulticastSetAttachedParticleEffect로 시작한 지속 이펙트를 중지(파괴)한다.
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStopAttachedParticleEffect();
+
+	// 캐릭터/소켓과 무관하게 StartLocation에서 스폰해 Duration 동안 EndLocation까지 선형 이동시키는
+	// 1회성 이펙트(예: 하늘을 가로지르는 드론/빔). Start/End/Duration이 이 호출 하나로 결정적으로 정해지므로,
+	// 매 프레임 위치를 리플리케이트할 필요 없이 각 클라이언트가 동일한 파라미터로 독립적으로 로컬 재생한다
+	// (호출 자체는 서버 권위 지점에서만, 이후 이동은 순수 로컬 타이머).
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayMovingParticleEffect(UParticleSystem* ParticleTemplate, FVector StartLocation, FVector EndLocation, float Duration);
 
 protected:
 	// 팀 식별자. 0=팀1, 1=팀2, 255=NoTeam. 각 캐릭터 BP에서 설정.

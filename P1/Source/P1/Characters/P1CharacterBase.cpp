@@ -7,6 +7,7 @@
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 #include "P1.h"
 
 AP1CharacterBase::AP1CharacterBase()
@@ -58,6 +59,61 @@ void AP1CharacterBase::MulticastPlayParticleEffect_Implementation(UParticleSyste
 	}
 
 	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ParticleTemplate, GetActorLocation());
+}
+
+void AP1CharacterBase::MulticastPlayParticleEffectAtLocation_Implementation(UParticleSystem* ParticleTemplate, FVector Location, FRotator Rotation, FVector Scale)
+{
+	if (!ParticleTemplate)
+	{
+		return;
+	}
+
+	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ParticleTemplate, Location, Rotation, Scale);
+}
+
+void AP1CharacterBase::MulticastPlayMovingParticleEffect_Implementation(UParticleSystem* ParticleTemplate, FVector StartLocation, FVector EndLocation, float Duration)
+{
+	if (!ParticleTemplate || Duration <= 0.0f)
+	{
+		return;
+	}
+
+	// bAutoDestroy=false — 이펙트 자체의 내부 루프/지속시간과 무관하게, 이동이 끝나는 시점에 우리가
+	// 직접 정지+파괴한다(MulticastSetAttachedParticleEffect와 동일한 이유).
+	UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(
+		GetWorld(), ParticleTemplate, StartLocation, (EndLocation - StartLocation).Rotation(), FVector(1.0f), false);
+	if (!PSC)
+	{
+		return;
+	}
+
+	// Start/End/Duration이 이 호출 하나로 결정적으로 정해지므로, 위치를 매 프레임 리플리케이트할 필요 없이
+	// 각 클라이언트가 독립적으로 로컬 타이머만으로 재생한다(0.02초 간격 — 위치 보간이 눈에 안 띄게 부드러운 수준).
+	const TWeakObjectPtr<UParticleSystemComponent> WeakPSC = PSC;
+	const double StartTime = GetWorld()->GetTimeSeconds();
+	const TSharedRef<FTimerHandle> MoveTimerHandle = MakeShared<FTimerHandle>();
+
+	FTimerDelegate MoveDelegate = FTimerDelegate::CreateWeakLambda(this,
+		[this, WeakPSC, StartLocation, EndLocation, StartTime, Duration, MoveTimerHandle]()
+		{
+			if (!WeakPSC.IsValid())
+			{
+				GetWorldTimerManager().ClearTimer(*MoveTimerHandle);
+				return;
+			}
+
+			const float Alpha = FMath::Clamp(static_cast<float>((GetWorld()->GetTimeSeconds() - StartTime) / Duration), 0.0f, 1.0f);
+			WeakPSC->SetWorldLocation(FMath::Lerp(StartLocation, EndLocation, Alpha));
+
+			if (Alpha >= 1.0f)
+			{
+				GetWorldTimerManager().ClearTimer(*MoveTimerHandle);
+				WeakPSC->DeactivateSystem();
+				WeakPSC->DestroyComponent();
+			}
+		});
+
+	GetWorldTimerManager().SetTimer(*MoveTimerHandle, MoveDelegate, 0.02f, true);
 }
 
 void AP1CharacterBase::MulticastSetAttachedParticleEffect_Implementation(UParticleSystem* ParticleTemplate, FName SocketName)

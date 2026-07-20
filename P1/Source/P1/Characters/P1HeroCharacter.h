@@ -116,6 +116,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "CC")
 	TObjectPtr<UAnimMontage> StunMontage;
 
+	// 피격 시 부여할 매우 짧은 신호용 Duration GE — State.HitReacting 태그만 부여(어트리뷰트 변경 없음).
+	// 이 GE 자체의 Duration이 리액션 "신호"의 유효 구간이며, 실제 몽타주 길이와 정확히 맞을 필요는 없다
+	// (몽타주는 한 번 재생되면 스스로 끝나는 원샷이라 태그 제거 시점엔 아무 것도 안 함).
+	UPROPERTY(EditDefaultsOnly, Category = "HitReact")
+	TSubclassOf<UGameplayEffect> HitReactEffectClass;
+
+	// 공격 몽타주와 동시에 재생돼야 하므로(맞아도 계속 때릴 수 있음), 이 몽타주 자체가 공격이 쓰는
+	// 슬롯과 겹치지 않는 슬롯(애디티브 등)을 쓰도록 애셋 쪽에서 구성해야 한다 — C++은 슬롯을 강제하지 않고
+	// Montage_Play만 호출한다(에디터 작업 필요, AnimBP 슬롯 컨벤션은 CLAUDE.md 참고).
+	UPROPERTY(EditDefaultsOnly, Category = "HitReact")
+	TObjectPtr<UAnimMontage> HitReactMontage;
+
 	// PossessedBy(서버)/OnRep_PlayerState(클라) 양쪽에서 호출되는 오케스트레이터 — "ASC를 쓸 수 있게
 	// 된 시점에 캐릭터가 해야 할 일 전체"를 순서대로 실행한다(GAS 와이어링, 사망/코스메틱 이벤트 구독,
 	// 권위 전용 베이스스탯 적용, 로컬 전용 UI 생성). PossessedBy/OnRep_PlayerState가 이 이름을 직접
@@ -141,10 +153,26 @@ protected:
 	// (입력 차단, 사망 몽타주), 제거(GE 자연 만료) 시 서버에서 RestartPlayer + 자신 Destroy.
 	void OnDeadTagChanged(FGameplayTag Tag, int32 NewCount);
 
-	// State.Stunned 태그 카운트 변경 — OnDeadTagChanged와 동일한 패턴. 부여 시 이동 입력 차단(어빌리티
-	// 발동 차단은 이미 베이스 어빌리티의 ActivationBlockedTags가 처리하므로 여기선 이동만 신경 쓰면 됨)
-	// + StunMontage 반복 재생, 제거 시 입력 복구 + 몽타주 정지.
+	// State.Stunned 태그 카운트 변경 — OnDeadTagChanged와 동일한 패턴. 부여 시 이동 입력 차단(이동은
+	// AP1PlayerController::HandleMove가 담당)과 StunMontage 반복 재생, 서버 권위로 진행 중이던 액티브
+	// 어빌리티 취소(CancelActiveAbilitiesOnStun)까지 처리. 새로운 어빌리티 발동 차단은 베이스 어빌리티의
+	// ActivationBlockedTags가 담당하지만, 그건 "아직 시작 안 한" 발동만 막을 뿐 스턴이 걸리는 순간 이미
+	// 조준/채널링 중이던 어빌리티는 별도로 취소해야 한다. 제거 시엔 몽타주 정지만(입력 복구는 태그 부재를
+	// PlayerController가 매 틱 확인하므로 별도 처리 불필요).
 	void OnStunTagChanged(FGameplayTag Tag, int32 NewCount);
+
+	// 스턴이 걸린 순간 진행 중이던 어빌리티(조준/채널링/스윙 등)를 취소한다. State.Attacking을 소유한
+	// 액티브 어빌리티만 대상으로 하므로, 이 태그를 명시적으로 뺀 상시 패시브(StoicismDeflect/Vitality)는
+	// 자동으로 영향을 받지 않는다. 서버 권위 전용 — OnStunTagChanged(NewCount>0)에서만 호출.
+	void CancelActiveAbilitiesOnStun();
+
+	// AttributeSet이 "데미지를 받았지만 생존"을 감지해 보낸 이벤트 수신 — 서버에서만 HitReactEffectClass를
+	// 자신에게 적용한다(OnDiedEventReceived와 동일한 패턴).
+	void OnHitReactEventReceived(const FGameplayEventData* EventData);
+
+	// State.HitReacting 태그 카운트 변경(GAS 태그 복제로 모든 클라이언트에서 호출됨) — 0→양수로 바뀌는
+	// 순간에만 HitReactMontage를 1회 재생한다(제거 시점엔 아무 것도 안 함, 원샷이라 스스로 끝남).
+	void OnHitReactTagChanged(FGameplayTag Tag, int32 NewCount);
 
 	// DeathMontage의 착지 프레임(UP1AnimNotify_SendGameplayEvent, Event.Montage.Death.Impact)에서
 	// 발신되는 이벤트 수신 — 래그돌 전환을 트리거한다. 태그 이벤트와 동일하게 각 클라이언트가

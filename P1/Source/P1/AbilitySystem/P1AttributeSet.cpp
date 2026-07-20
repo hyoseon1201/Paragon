@@ -170,6 +170,13 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 				DeathEventData.EventTag = TAG_Event_Character_Died;
 				ASC->HandleGameplayEvent(TAG_Event_Character_Died, &DeathEventData);
 			}
+			else if (ASC)
+			{
+				// 데미지를 받았지만 생존 — 피격 리액션 신호를 보낸다. GE 적용 자체는 캐릭터 클래스에 위임.
+				FGameplayEventData HitReactEventData;
+				HitReactEventData.EventTag = TAG_Event_Character_HitReact;
+				ASC->HandleGameplayEvent(TAG_Event_Character_HitReact, &HitReactEventData);
+			}
 		}
 	}
 	else if (Attr == GetHealthAttribute())

@@ -92,6 +92,11 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 	// 같은 이유로 재검토가 필요할 수 있음).
 	ASC->RegisterGameplayTagEvent(TAG_State_Stunned, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnStunTagChanged);
 
+	// 피격 리액션 — Died/Stun과 동일한 패턴(이벤트는 서버 전용 GE 적용 트리거, 실제 재생은 태그 복제로
+	// 전 클라이언트에 전파).
+	ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Character_HitReact).AddUObject(this, &AP1HeroCharacter::OnHitReactEventReceived);
+	ASC->RegisterGameplayTagEvent(TAG_State_HitReacting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnHitReactTagChanged);
+
 	// 버프 태그에 반응하는 코스메틱 이펙트(검 발광 등)가 있는 영웅이면(컴포넌트가 붙어있으면) ASC를 넘겨준다.
 	// 어떤 태그/이펙트인지는 전부 컴포넌트 쪽 데이터가 갖고 있어 이 클래스는 특정 스킬을 몰라도 된다.
 	if (UP1BuffCosmeticEffectComponent* CosmeticComp = FindComponentByClass<UP1BuffCosmeticEffectComponent>())
@@ -381,6 +386,77 @@ void AP1HeroCharacter::OnStunTagChanged(FGameplayTag Tag, int32 NewCount)
 	else if (AnimInstance->Montage_IsPlaying(StunMontage))
 	{
 		AnimInstance->Montage_Stop(0.25f, StunMontage);
+	}
+
+	if (NewCount > 0 && HasAuthority())
+	{
+		CancelActiveAbilitiesOnStun();
+	}
+}
+
+void AP1HeroCharacter::CancelActiveAbilitiesOnStun()
+{
+	UAbilitySystemComponent* ASC = CachedAbilitySystemComponent.Get();
+	if (!IsValid(ASC))
+	{
+		return;
+	}
+
+	// State.Attacking을 소유한(=현재 조준/채널링/스윙 등으로 "진행 중"인) 액티브 어빌리티만 취소한다.
+	// StoicismDeflect/Vitality 같은 상시 패시브는 생성자에서 State.Attacking을 명시적으로 Remove해뒀으므로
+	// (GAS 컨벤션 참고) 이 필터만으로 자동 제외된다 — CancelAbilities()의 WithTags는 AssetTags를 검사하지만
+	// 여기서 걸러야 하는 건 ActivationOwnedTags라 표준 헬퍼 대신 직접 순회한다.
+	TArray<FGameplayAbilitySpecHandle> HandlesToCancel;
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		const UP1GameplayAbility* P1Ability = Cast<UP1GameplayAbility>(Spec.Ability);
+		if (Spec.IsActive() && P1Ability && P1Ability->OwnsActivationTag(TAG_State_Attacking))
+		{
+			HandlesToCancel.Add(Spec.Handle);
+		}
+	}
+
+	for (const FGameplayAbilitySpecHandle& Handle : HandlesToCancel)
+	{
+		ASC->CancelAbilityHandle(Handle);
+	}
+}
+
+void AP1HeroCharacter::OnHitReactEventReceived(const FGameplayEventData* EventData)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = CachedAbilitySystemComponent.Get();
+	if (!IsValid(ASC) || !HitReactEffectClass)
+	{
+		return;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(this);
+
+	const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(HitReactEffectClass, 1.0f, EffectContext);
+	if (SpecHandle.IsValid())
+	{
+		ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	}
+}
+
+void AP1HeroCharacter::OnHitReactTagChanged(FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount <= 0 || !HitReactMontage)
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		// 공격 몽타주와 동시에 재생돼야 하므로 Montage_Play만 호출 — 실제로 겹쳐 보이려면 HitReactMontage
+		// 애셋 자체가 공격이 쓰는 슬롯과 다른(애디티브 등) 슬롯을 쓰도록 구성돼 있어야 한다.
+		AnimInstance->Montage_Play(HitReactMontage);
 	}
 }
 

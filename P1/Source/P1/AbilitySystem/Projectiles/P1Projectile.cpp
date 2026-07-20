@@ -15,11 +15,14 @@ AP1Projectile::AP1Projectile()
 	CollisionComponent->InitSphereRadius(15.0f);
 	CollisionComponent->SetCollisionObjectType(ECC_WorldDynamic);
 	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	// Pawn은 Block이 아니라 Overlap — 관통 투사체가 첫 대상과 물리적으로 충돌해 멈추거나 튕기면 안 되기
+	// 때문에 애초에 막히지 않도록 한다(단발 투사체는 어차피 OnPawnOverlap에서 바로 Destroy()하므로 동작 동일).
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
 	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
 	// 팀 판별(아군 무시)은 여기서 안 한다 — OnProjectileHit을 받는 어빌리티 쪽에서 IsSameTeam()으로 판단.
 	CollisionComponent->OnComponentHit.AddDynamic(this, &AP1Projectile::OnHit);
+	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AP1Projectile::OnPawnOverlap);
 	SetRootComponent(CollisionComponent);
 
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
@@ -50,6 +53,13 @@ void AP1Projectile::BeginPlay()
 	if (AActor* MyOwner = GetOwner())
 	{
 		CollisionComponent->IgnoreActorWhenMoving(MyOwner, true);
+	}
+
+	// 튕기는 투사체(Stasis Bomb 등)는 MaxBounces>0로 설정하는 것만으로 물리 반사까지 자동으로 켜지게 한다 —
+	// BP에서 bShouldBounce를 따로 켜는 걸 잊어 "MaxBounces는 설정했는데 실제로는 안 튕기는" 실수를 방지.
+	if (MaxBounces > 0 && ProjectileMovement)
+	{
+		ProjectileMovement->bShouldBounce = true;
 	}
 }
 
@@ -100,11 +110,53 @@ void AP1Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPri
 		return;
 	}
 
+	// 아직 튕길 여유가 남아있으면 소멸하지 않고 그대로 둔다 — 실제 반사(속도 반전)는
+	// ProjectileMovement->bShouldBounce가 이미 처리했으므로 여기서는 카운트만 올리고 끝.
+	if (CurrentBounceCount < MaxBounces)
+	{
+		++CurrentBounceCount;
+		UE_LOG(LogP1, Log, TEXT("[Projectile] 튕김 %d/%d — %s (이동거리=%.0f)"),
+			CurrentBounceCount, MaxBounces, *OtherActor->GetName(), GetDistanceTraveled());
+		return;
+	}
+
 	UE_LOG(LogP1, Log, TEXT("[Projectile] OnHit — %s (이동거리=%.0f)"), *OtherActor->GetName(), GetDistanceTraveled());
 
 	MulticastPlayHitEffect(Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
 	OnProjectileHit.Broadcast(OtherActor, Hit);
 	Destroy();
+}
+
+void AP1Projectile::OnPawnOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (!OtherActor || OtherActor == this || OtherActor == GetOwner() || OtherActor == GetInstigator())
+	{
+		return;
+	}
+
+	if (HitActors.Contains(OtherActor))
+	{
+		return;
+	}
+	HitActors.Add(OtherActor);
+
+	UE_LOG(LogP1, Log, TEXT("[Projectile] OnPawnOverlap — %s (이동거리=%.0f, 관통=%d)"),
+		*OtherActor->GetName(), GetDistanceTraveled(), bPierceThroughTargets ? 1 : 0);
+
+	const FVector EffectLocation = SweepResult.bBlockingHit ? FVector(SweepResult.ImpactPoint) : OtherActor->GetActorLocation();
+	MulticastPlayHitEffect(EffectLocation, SweepResult.ImpactNormal.Rotation());
+	OnProjectileHit.Broadcast(OtherActor, SweepResult);
+
+	if (!bPierceThroughTargets)
+	{
+		Destroy();
+	}
 }
 
 void AP1Projectile::MulticastPlayHitEffect_Implementation(FVector Location, FRotator Rotation)

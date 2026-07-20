@@ -35,7 +35,11 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 		return;
 	}
 
-	// 지면 조준 중: LMB=확정, RMB=취소로 리라우팅하고 나머지 어빌리티 입력은 차단(삼킴).
+	// 지면 조준 중: LMB=확정, InputTag.Ability.Cancel(F 등 전용 키)=취소로 리라우팅하고 나머지 어빌리티
+	// 입력은 차단(삼킴). 취소를 예전처럼 "조준을 시작한 스킬 키(RMB 등) 재입력"으로 처리하지 않는 이유 —
+	// 홀드해서 조준하고 키를 떼야 발사하는 스킬은 "떼는 순간"이 이미 확정 동작이라, 같은 키로는 취소를
+	// 표현할 방법이 없다(눌렀다 뗄 때마다 매번 확정돼버림). 전용 취소 키로 분리하면 조준을 어떤 스킬
+	// 키(RMB/Q/E 등)로 시작했든, 입력 방식이 탭이든 홀드든 상관없이 항상 하나의 방법으로 취소된다.
 	// (WASD 이동은 Enhanced Input Move 액션이라 이 경로를 거치지 않아 영향 없음)
 	if (HasMatchingGameplayTag(TAG_State_TargetingAbility))
 	{
@@ -43,7 +47,7 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 		{
 			LocalInputConfirm();
 		}
-		else if (InputTag == TAG_InputTag_Ability_RMB)
+		else if (InputTag == TAG_InputTag_Ability_Cancel)
 		{
 			LocalInputCancel();
 		}
@@ -152,12 +156,12 @@ void UP1AbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& Inpu
 		return;
 	}
 
-	// 조준 중에는 release도 삼킨다 (확정/취소는 press로만 처리).
-	if (HasMatchingGameplayTag(TAG_State_TargetingAbility))
-	{
-		return;
-	}
-
+	// 조준 중이어도 release는 삼키지 않고 아래 루프로 그대로 통과시킨다 — 조준을 시작한 스킬 자신의
+	// InputTag(예: RMB)에 대한 release는 여전히 그 어빌리티(활성 중인 스펙)에게 정상 전달돼야 한다.
+	// Stasis Bomb처럼 "누르고 있으면 조준, 떼는 순간 발사"하는 스킬은 이 release 이벤트 자체가 발사
+	// 트리거라서(InputReleased() 오버라이드), 예전처럼 여기서 전부 삼키면 영원히 발사되지 않았다.
+	// 아래 루프는 원래도 "활성 중인 스펙과 태그가 일치하는 입력만" 전달하므로, 조준과 무관한 다른
+	// 어빌리티가 실수로 활성화될 위험은 없다(그건 AbilityInputTagPressed 쪽에서만 막으면 되는 문제).
 	for (FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
 	{
 		if (AbilitySpec.Ability && AbilitySpec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
