@@ -51,7 +51,7 @@ void AP1HeroCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 
-	InitAbilityActorInfo();
+	HandleAbilitySystemReady();
 	AddDefaultAbilities();
 }
 
@@ -59,35 +59,38 @@ void AP1HeroCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 
-	InitAbilityActorInfo();
+	HandleAbilitySystemReady();
 }
 
-void AP1HeroCharacter::InitAbilityActorInfo()
+void AP1HeroCharacter::HandleAbilitySystemReady()
 {
-	UE_LOG(LogP1, Log, TEXT("[GAS] InitAbilityActorInfo called on %s | Authority=%d"), *GetName(), HasAuthority());
-
 	AP1PlayerState* P1PS = GetPlayerState<AP1PlayerState>();
 	if (!IsValid(P1PS))
 	{
-		UE_LOG(LogP1, Warning, TEXT("[GAS] InitAbilityActorInfo: PlayerState is null on %s"), *GetName());
+		UE_LOG(LogP1, Warning, TEXT("[GAS] HandleAbilitySystemReady: PlayerState is null on %s"), *GetName());
 		return;
 	}
 
 	UAbilitySystemComponent* ASC = P1PS->GetAbilitySystemComponent();
 	if (!IsValid(ASC))
 	{
-		UE_LOG(LogP1, Warning, TEXT("[GAS] InitAbilityActorInfo: ASC is null on %s"), *GetName());
+		UE_LOG(LogP1, Warning, TEXT("[GAS] HandleAbilitySystemReady: ASC is null on %s"), *GetName());
 		return;
 	}
 
-	ASC->InitAbilityActorInfo(P1PS, this);
-	CachedAbilitySystemComponent = ASC;
+	InitAbilityActorInfo(P1PS, ASC);
 
 	// 사망/리스폰: AttributeSet이 보내는 이벤트(Died) 및 State.Dead 태그 변경(전 클라이언트, 태그 복제로 자동 전파)을 구독.
 	ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Character_Died).AddUObject(this, &AP1HeroCharacter::OnDiedEventReceived);
 	ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Montage_Death_Impact).AddUObject(this, &AP1HeroCharacter::OnDeathImpactEventReceived);
-	ASC->RegisterGameplayTagEvent(TAG_State_Dead, EGameplayTagEventType::NewOrRemoved)
-		.AddUObject(this, &AP1HeroCharacter::OnDeadTagChanged);
+	ASC->RegisterGameplayTagEvent(TAG_State_Dead, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnDeadTagChanged);
+
+	// 기절 — 각 클라이언트가 독립적으로 몽타주 재생/정지(태그 복제로 자동 전파). 이동/어빌리티 입력
+	// 차단은 여기서 안 하고 AP1PlayerController::HandleMove()/베이스 어빌리티 ActivationBlockedTags가
+	// 각자 담당(실제 입력 바인딩이 캐릭터가 아니라 PlayerController의 InputComponent에 있어서, 여기서
+	// DisableInput을 불러도 그 바인딩엔 영향이 없기 때문 — OnDeadTagChanged가 쓰는 DisableInput 패턴은
+	// 같은 이유로 재검토가 필요할 수 있음).
+	ASC->RegisterGameplayTagEvent(TAG_State_Stunned, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnStunTagChanged);
 
 	// 버프 태그에 반응하는 코스메틱 이펙트(검 발광 등)가 있는 영웅이면(컴포넌트가 붙어있으면) ASC를 넘겨준다.
 	// 어떤 태그/이펙트인지는 전부 컴포넌트 쪽 데이터가 갖고 있어 이 클래스는 특정 스킬을 몰라도 된다.
@@ -98,16 +101,7 @@ void AP1HeroCharacter::InitAbilityActorInfo()
 
 	if (HasAuthority())
 	{
-		if (DefaultAttributesEffect)
-		{
-			// 스폰/리스폰 공용 — 실제 CharacterLevel로 재적용(레벨업 시스템 도입 전 1.0f 하드코딩하던 버그 수정)
-			// 하고 bFullHeal=true로 체력/마나를 완전 회복한다(리스폰 시 반쯤 찬 체력으로 시작하던 문제 해결).
-			ApplyBaseStatsForLevel(P1PS->GetCharacterLevel(), /*bFullHeal=*/true);
-		}
-		else
-		{
-			UE_LOG(LogP1, Warning, TEXT("[GAS] InitAbilityActorInfo: DefaultAttributesEffect is not set on %s"), *GetName());
-		}
+		ApplyBaseStatsForLevel(P1PS->GetCharacterLevel(), /*bFullHeal=*/true);
 	}
 
 	BindMoveSpeedAttribute();
@@ -116,12 +110,12 @@ void AP1HeroCharacter::InitAbilityActorInfo()
 	if (IsValid(FloatingStatusComponent))
 	{
 		// 자기 자신의 머리 위 바는 자기 화면엔 안 보여야 한다 — 아래 HUD 생성과 동일하게
-		// IsLocallyControlled()로 판단(이 함수 내에서 이미 검증된 패턴). 다른 클라이언트가 이 폰을
-		// 볼 때는 그쪽에서 false이므로 정상 표시된다. Space=Screen이라 회전/빌보드 처리는 필요 없다.
+		// IsLocallyControlled()로 판단. 다른 클라이언트가 이 폰을 볼 때는 그쪽에서 false이므로
+		// 정상 표시된다. Space=Screen이라 회전/빌보드 처리는 필요 없다.
 		FloatingStatusComponent->SetVisibility(!IsLocallyControlled());
 
 		// WidgetComponent는 UserWidget 인스턴스를 지연 생성한다 — 원격 클라이언트에서 방금 막
-		// 리플리케이트되어 들어온(다른 플레이어의) 폰의 경우, InitAbilityActorInfo가 이 시점에 불릴 때
+		// 리플리케이트되어 들어온(다른 플레이어의) 폰의 경우, 이 함수가 이 시점에 불릴 때
 		// 아직 위젯이 생성 전이라 GetUserWidgetObject()가 null을 반환할 수 있다. 그러면 이 블록 전체가
 		// 스킵되고, OnRep_PlayerState는 보통 폰 생애주기 중 다시 안 불리므로 그 폰의 머리 위 바가
 		// 영원히 바인딩 안 된 채(0/1 표시) 남는다 — InitWidget()으로 강제 즉시 생성해 이 경쟁을 없앤다.
@@ -131,8 +125,7 @@ void AP1HeroCharacter::InitAbilityActorInfo()
 		{
 			if (!FloatingStatusWidgetController)
 			{
-				AP1PlayerState* PS = GetPlayerState<AP1PlayerState>();
-				const FWidgetControllerParams Params(nullptr, PS, ASC, PS ? PS->GetAttributeSet() : nullptr);
+				const FWidgetControllerParams Params(nullptr, P1PS, ASC, P1PS->GetAttributeSet());
 				FloatingStatusWidgetController = NewObject<UP1FloatingStatusWidgetController>(this);
 				FloatingStatusWidgetController->SetWidgetControllerParams(Params);
 				FloatingStatusWidgetController->BindCallbacksToDependencies();
@@ -146,11 +139,28 @@ void AP1HeroCharacter::InitAbilityActorInfo()
 	// 소유 클라이언트(리슨서버 포함)에서만 메인 HUD 생성.
 	if (IsLocallyControlled())
 	{
-		if (AP1PlayerController* PC = Cast<AP1PlayerController>(GetController()))
+		AP1PlayerController* PC = Cast<AP1PlayerController>(GetController());
+		if (!PC)
 		{
-			PC->CreateHUDForASC(ASC);
+			UE_LOG(LogP1, Warning, TEXT("[HUD] HandleAbilitySystemReady: IsLocallyControlled=true인데 GetController()가 AP1PlayerController로 캐스트 실패 (%s)"), *GetName());
+			return;
+		}
+
+		if (AP1HUD* P1HUD = PC->GetHUD<AP1HUD>())
+		{
+			P1HUD->InitOverlay(PC, P1PS, ASC, P1PS->GetAttributeSet());
+		}
+		else
+		{
+			UE_LOG(LogP1, Warning, TEXT("[HUD] HandleAbilitySystemReady: GetHUD<AP1HUD>()가 null (%s) — ArenaGameMode의 HUDClass가 BP_P1HUD로 설정됐는지 확인"), *GetName());
 		}
 	}
+}
+
+void AP1HeroCharacter::InitAbilityActorInfo(AP1PlayerState* P1PS, UAbilitySystemComponent* ASC)
+{
+	ASC->InitAbilityActorInfo(P1PS, this);
+	CachedAbilitySystemComponent = ASC;
 }
 
 void AP1HeroCharacter::AddDefaultAbilities()
@@ -200,6 +210,14 @@ void AP1HeroCharacter::AddDefaultAbilities()
 				AbilitySpec.GetDynamicSpecSourceTags().AddTag(AbilityCDO->InputTag);
 			}
 			bActivateOnGranted = AbilityCDO->bActivateOnGranted;
+
+			// 스킬 포인트로 투자 가능한 어빌리티(RMB/Q/E/R)는 Level 0(미투자)으로 부여한다 — 좌클릭/
+			// 패시브처럼 항상 켜져 있는 어빌리티만 기본 Level 1을 유지. Level 0이면 UP1GameplayAbility::
+			// CanActivateAbility가 발동을 막으므로, 1레벨에 아무것도 안 눌려있는 상태로 시작한다.
+			if (AbilityCDO->MaxAbilityLevel > 1)
+			{
+				AbilitySpec.Level = 0;
+			}
 		}
 		else
 		{
@@ -342,6 +360,28 @@ void AP1HeroCharacter::OnDeadTagChanged(FGameplayTag Tag, int32 NewCount)
 void AP1HeroCharacter::OnDeathImpactEventReceived(const FGameplayEventData* EventData)
 {
 	StartRagdoll();
+}
+
+void AP1HeroCharacter::OnStunTagChanged(FGameplayTag Tag, int32 NewCount)
+{
+	UE_LOG(LogP1, Log, TEXT("[CC] OnStunTagChanged — NewCount=%d (%s)"), NewCount, *GetName());
+
+	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInstance || !StunMontage)
+	{
+		return;
+	}
+
+	if (NewCount > 0)
+	{
+		// 기절 지속시간이 소스마다 달라(거리 비례 스케일 등) 몽타주 길이와 정확히 안 맞을 수 있으므로,
+		// 몽타주 자체를 Loop로 만들어두고 태그가 사라질 때(NewCount==0) 정지시키는 방식으로 맞춘다.
+		AnimInstance->Montage_Play(StunMontage);
+	}
+	else if (AnimInstance->Montage_IsPlaying(StunMontage))
+	{
+		AnimInstance->Montage_Stop(0.25f, StunMontage);
+	}
 }
 
 void AP1HeroCharacter::StartRagdoll()

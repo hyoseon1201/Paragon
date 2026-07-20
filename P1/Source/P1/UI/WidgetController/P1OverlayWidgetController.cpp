@@ -64,6 +64,7 @@ void UP1OverlayWidgetController::BindCallbacksToDependencies()
 	{
 		P1PS->OnCharacterLevelChangedNative.AddUObject(this, &UP1OverlayWidgetController::OnCharacterLevelChanged);
 		P1PS->OnKDAChangedNative.AddUObject(this, &UP1OverlayWidgetController::OnKDAChanged_Internal);
+		P1PS->OnSkillPointsChangedNative.AddUObject(this, &UP1OverlayWidgetController::OnSkillPointsChanged_Internal);
 	}
 
 	if (UP1AbilitySystemComponent* P1ASC = Cast<UP1AbilitySystemComponent>(AbilitySystemComponent))
@@ -121,6 +122,42 @@ void UP1OverlayWidgetController::BroadcastAbilityInfo()
 			.AddUObject(this, &UP1OverlayWidgetController::OnAbilityCooldownTagChanged,
 				Ability->InputTag, TWeakObjectPtr<UGameplayAbility>(Spec.Ability), Spec.Handle);
 	}
+
+	BroadcastAbilityInvestState();
+}
+
+void UP1OverlayWidgetController::BroadcastAbilityInvestState()
+{
+	const AP1PlayerState* P1PS = Cast<AP1PlayerState>(PlayerState);
+	if (!P1PS)
+	{
+		return;
+	}
+	const bool bHasSkillPoints = P1PS->GetSkillPoints() > 0;
+
+	for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		const UP1GameplayAbility* Ability = Cast<UP1GameplayAbility>(Spec.Ability);
+		// MaxAbilityLevel<=1(기본값) = 투자 불가 어빌리티(기본공격/패시브 등) — 애초에 브로드캐스트하지 않는다.
+		if (!Ability || !Ability->InputTag.IsValid() || Ability->MaxAbilityLevel <= 1)
+		{
+			UE_LOG(LogP1, Log, TEXT("[OverlayWC][Invest] 스킵 — %s | MaxAbilityLevel=%d (투자 불가 어빌리티)"),
+				Ability ? *Ability->GetClass()->GetName() : TEXT("null"), Ability ? Ability->MaxAbilityLevel : -1);
+			continue;
+		}
+
+		const bool bBelowMaxLevel = Spec.Level < Ability->MaxAbilityLevel;
+		const bool bMeetsCharacterLevelGate = P1PS->GetCharacterLevel() >= Ability->GetRequiredCharacterLevelForNextRank(Spec.Level);
+		const bool bCanInvest = bHasSkillPoints && bBelowMaxLevel && bMeetsCharacterLevelGate;
+		UE_LOG(LogP1, Log, TEXT("[OverlayWC][Invest] %s InputTag=%s SpecLevel=%d MaxLevel=%d SkillPoints=%d(has=%d) BelowMax=%d CharLevelGate=%d → bCanInvest=%d"),
+			*Ability->GetClass()->GetName(), *Ability->InputTag.ToString(), Spec.Level, Ability->MaxAbilityLevel,
+			P1PS->GetSkillPoints(), bHasSkillPoints, bBelowMaxLevel, bMeetsCharacterLevelGate, bCanInvest);
+		OnAbilityInvestStateChanged.Broadcast(Ability->InputTag, bCanInvest);
+
+		// 잠김 여부는 bCanInvest와 다른 축이다 — 포인트가 지금 없어도(bHasSkillPoints=false) Level 0이면
+		// 여전히 잠긴 것으로 표시해야 한다(아이콘이 어둡게 유지).
+		OnAbilityLockedStateChanged.Broadcast(Ability->InputTag, Spec.Level <= 0);
+	}
 }
 
 void UP1OverlayWidgetController::OnAbilityCooldownTagChanged(const FGameplayTag CooldownTag, int32 NewCount,
@@ -172,6 +209,13 @@ void UP1OverlayWidgetController::OnCharacterLevelChanged(int32 NewLevel)
 void UP1OverlayWidgetController::OnKDAChanged_Internal(int32 Kills, int32 Deaths, int32 Assists)
 {
 	OnKDAChanged.Broadcast(Kills, Deaths, Assists);
+}
+
+void UP1OverlayWidgetController::OnSkillPointsChanged_Internal(int32 NewValue)
+{
+	// SkillPoints는 레벨업(증가)과 포인트 투자(감소) 양쪽에서 바뀐다 — 어느 쪽이든 4개 투자 가능
+	// 어빌리티의 "지금 투자 버튼을 보여줘도 되는지"가 전부 다시 계산돼야 하므로 통째로 재브로드캐스트.
+	BroadcastAbilityInvestState();
 }
 
 void UP1OverlayWidgetController::BroadcastExperience()

@@ -105,6 +105,19 @@ void UP1BackendSubsystem::JoinQueue()
 	Request->ProcessRequest();
 }
 
+void UP1BackendSubsystem::LeaveQueue()
+{
+	if (AuthToken.IsEmpty())
+	{
+		OnQueueLeft.Broadcast(false, TEXT("NOT_LOGGED_IN"));
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = CreateRequest(TEXT("/api/match/leave"), TEXT("POST"), true);
+	Request->OnProcessRequestComplete().BindUObject(this, &UP1BackendSubsystem::OnLeaveQueueResponseReceived);
+	Request->ProcessRequest();
+}
+
 void UP1BackendSubsystem::OnSignupResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully)
 {
 	if (bConnectedSuccessfully && Response.IsValid() && Response->GetResponseCode() == 201)
@@ -157,6 +170,28 @@ void UP1BackendSubsystem::OnQueueResponseReceived(FHttpRequestPtr Request, FHttp
 	if (!bMatched)
 	{
 		StartPolling();
+	}
+}
+
+void UP1BackendSubsystem::OnLeaveQueueResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully)
+{
+	if (!bConnectedSuccessfully || !Response.IsValid() || Response->GetResponseCode() != 200)
+	{
+		const FString ErrorCode = ExtractErrorCode(Response);
+		UE_LOG(LogP1, Warning, TEXT("[Backend] LeaveQueue 실패 — %s"), *ErrorCode);
+		OnQueueLeft.Broadcast(false, ErrorCode);
+		return;
+	}
+
+	// 이탈 요청이 서버에 도달하기 직전에 매칭이 이미 성사됐을 수도 있다(레이스) — 이땐 백엔드가
+	// MATCHED를 그대로 돌려주므로 이탈이 아니라 매칭 성사로 처리한다(HandleMatchStatusPayload가
+	// OnMatchFound 브로드캐스트+폴링 정지까지 알아서 해준다).
+	const bool bMatched = HandleMatchStatusPayload(Response->GetContentAsString());
+	if (!bMatched)
+	{
+		StopPolling();
+		UE_LOG(LogP1, Log, TEXT("[Backend] 매칭 대기열 이탈 완료"));
+		OnQueueLeft.Broadcast(true, FString());
 	}
 }
 

@@ -31,6 +31,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnKDAChangedSignature, int32, Ki
 // Experience 값 자체가 안 바뀌어도 재브로드캐스트가 필요할 수 있다(레벨업 순간).
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExperienceChangedSignature, float, CurrentXP, float, XPRequiredForNextLevel);
 
+// 이 어빌리티의 "포인트 투자" 버튼을 보여줘도 되는지(SkillPoints 보유 + 아직 최대 레벨 아님).
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAbilityInvestStateChangedSignature, FGameplayTag, InputTag, bool, bCanInvest);
+
+// 이 어빌리티가 아직 잠겨있는지(Spec.Level<=0, 포인트를 한 번도 투자 안 함) — 아이콘을 쿨다운처럼
+// 어둡게 표시하는 데 쓴다. bCanInvest(포인트가 지금 있는지)와는 다른 축이다 — 포인트가 없어도
+// 아직 미투자 상태면 계속 잠김으로 표시돼야 한다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnAbilityLockedStateChangedSignature, FGameplayTag, InputTag, bool, bLocked);
+
 // 인게임 HUD(HP·MP·리젠·스킬슬롯 등)용 WidgetController.
 // ASC 속성 변경을 구독하고 위젯에 브로드캐스트한다.
 UCLASS(BlueprintType)
@@ -72,6 +80,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events|Ability")
 	FOnCooldownClearSignature OnCooldownClear;
 
+	UPROPERTY(BlueprintAssignable, Category = "Events|Ability")
+	FOnAbilityInvestStateChangedSignature OnAbilityInvestStateChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events|Ability")
+	FOnAbilityLockedStateChangedSignature OnAbilityLockedStateChanged;
+
 	// ---- Progression (레벨/KDA/경험치/골드) ----
 	UPROPERTY(BlueprintAssignable, Category = "Events|Progression")
 	FOnLevelChangedSignature OnLevelChanged;
@@ -95,9 +109,15 @@ private:
 	void OnGoldAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnExperienceAttributeChanged(const FOnAttributeChangeData& Data);
 
-	// AP1PlayerState의 네이티브 델리게이트 핸들러 (레벨/KDA — GAS 어트리뷰트가 아닌 plain int)
+	// AP1PlayerState의 네이티브 델리게이트 핸들러 (레벨/KDA/스킬포인트 — GAS 어트리뷰트가 아닌 plain int)
 	void OnCharacterLevelChanged(int32 NewLevel);
 	void OnKDAChanged_Internal(int32 Kills, int32 Deaths, int32 Assists);
+	void OnSkillPointsChanged_Internal(int32 NewValue);
+
+	// 투자 가능한(MaxAbilityLevel > 1) 각 어빌리티마다 "지금 투자 버튼을 보여줘도 되는지"를 다시 계산해
+	// 브로드캐스트한다 — SkillPoints가 바뀔 때(레벨업으로 증가/투자로 소비)마다, 그리고 어빌리티 목록이
+	// 처음 갖춰졌을 때(BroadcastAbilityInfo) 호출된다.
+	void BroadcastAbilityInvestState();
 
 	// 현재 Experience/XPRequired를 함께 브로드캐스트하는 공용 헬퍼 — Experience 변경, 레벨 변경(=XPRequired 변경)
 	// 양쪽에서 호출된다.

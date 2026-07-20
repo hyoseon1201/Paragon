@@ -20,6 +20,9 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Minion, "Character.Type.Minion
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Invulnerable, "State.Invulnerable", "무적 상태 — UP1AttributeSet이 Damage 처리 시 이 태그가 있으면 데미지를 무시(0으로 처리)한다")
 
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Stunned, "State.Stunned", "기절 상태 — 베이스 어빌리티 ActivationBlockedTags에 포함되어 대부분의 어빌리티 발동을 막고, AP1PlayerController::HandleMove()가 직접 체크해 이동도 막는다")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_StunDuration, "Data.StunDuration", "기절 GE의 SetByCaller 지속시간 채널 — 소스마다 다른 기절 시간을 공유 GE 하나로 재사용")
+
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Dead, "State.Dead", "사망 상태 GE가 부여하는 태그 — 전 어빌리티 ActivationBlockedTags에 포함, GE 자연 만료 시점이 리스폰 시점")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_Died, "Event.Character.Died", "AttributeSet이 Health<=0을 감지하면 보내는 이벤트 — 캐릭터가 받아 State.Dead GE를 자신에게 적용")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_RespawnDelay, "Data.RespawnDelay", "사망 GE의 Duration(리스폰 대기시간) SetByCaller 채널")

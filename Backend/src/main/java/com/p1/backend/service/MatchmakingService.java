@@ -36,7 +36,10 @@ public class MatchmakingService {
     }
 
     public synchronized MatchStatusResponse joinQueue(String username) {
-        String existingMatch = matchedUsers.get(username);
+        // remove(): 매칭 결과는 클라이언트에게 한 번 전달되면 소비된다. get()으로 남겨두면
+        // 예전에 매칭됐던 유저가 재접속 후 다시 큐에 들어갈 때 대기열 인원 체크 없이
+        // 즉시 MATCHED가 재반환되는 버그가 생긴다(실제로 발생했던 문제).
+        String existingMatch = matchedUsers.remove(username);
         if (existingMatch != null) {
             return new MatchStatusResponse(MatchStatus.MATCHED, existingMatch);
         }
@@ -47,15 +50,30 @@ public class MatchmakingService {
 
         tryFormMatch();
 
-        String matched = matchedUsers.get(username);
+        String matched = matchedUsers.remove(username);
         if (matched != null) {
             return new MatchStatusResponse(MatchStatus.MATCHED, matched);
         }
         return new MatchStatusResponse(MatchStatus.WAITING, null);
     }
 
+    // 대기열 이탈. 이미 매칭이 성사된 뒤라면(이탈 요청이 도착하기 직전에 매칭이 형성된 레이스) 취소할
+    // 수 없으므로 그대로 MATCHED를 돌려준다 — 호출부가 이걸 "매칭 성사"로 처리해야 한다.
+    public synchronized MatchStatusResponse leaveQueue(String username) {
+        String existingMatch = matchedUsers.remove(username);
+        if (existingMatch != null) {
+            return new MatchStatusResponse(MatchStatus.MATCHED, existingMatch);
+        }
+
+        if (queuedUsernames.remove(username)) {
+            queue.remove(username);
+        }
+
+        return new MatchStatusResponse(MatchStatus.NOT_QUEUED, null);
+    }
+
     public MatchStatusResponse getStatus(String username) {
-        String matched = matchedUsers.get(username);
+        String matched = matchedUsers.remove(username);
         if (matched != null) {
             return new MatchStatusResponse(MatchStatus.MATCHED, matched);
         }

@@ -16,6 +16,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnQueueJoinedSignature, bool, bSuc
 // 매칭 성사 — ServerAddress로 ClientTravel하면 됨.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchFoundSignature, FString, ServerAddress);
 
+// 대기열 이탈 요청 자체의 성공/실패. 이탈 요청이 도착하기 직전에 매칭이 이미 성사된 경우(레이스)
+// 이탈이 아니라 OnMatchFound가 대신 브로드캐스트된다.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnQueueLeftSignature, bool, bSuccess, FString, ErrorMessage);
+
 // PreGame(로비) 레벨에서 웹 백엔드(Spring Boot)와 통신하는 창구. 로그인/회원가입/매칭 대기열 HTTP 호출과
 // JWT 토큰 보관, 매칭 상태 폴링을 전담한다. GameInstance 생존주기 동안 유지되므로 ClientTravel로 Arena
 // 서버에 접속한 뒤에도(향후 매치 결과 보고 등에 재사용 가능하도록) 살아있다.
@@ -39,6 +43,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Backend")
 	FOnMatchFoundSignature OnMatchFound;
 
+	UPROPERTY(BlueprintAssignable, Category = "Backend")
+	FOnQueueLeftSignature OnQueueLeft;
+
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	void Signup(const FString& Username, const FString& Password);
 
@@ -50,6 +57,11 @@ public:
 	// WAITING이면 내부 타이머로 /api/match/status를 주기적으로 폴링하기 시작한다.
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	void JoinQueue();
+
+	// 대기열에서 스스로 빠진다. 이미 매칭이 성사된 뒤라면 서버가 취소를 거부하고 그대로 MATCHED를
+	// 돌려주며, 이 경우 OnQueueLeft가 아니라 OnMatchFound가 대신 브로드캐스트된다.
+	UFUNCTION(BlueprintCallable, Category = "Backend")
+	void LeaveQueue();
 
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	bool IsLoggedIn() const { return !AuthToken.IsEmpty(); }
@@ -72,6 +84,7 @@ private:
 	void OnSignupResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully);
 	void OnLoginResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully);
 	void OnQueueResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully);
+	void OnLeaveQueueResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully);
 	void OnStatusResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bConnectedSuccessfully);
 
 	// {status, serverAddress} 응답 바디를 공용으로 처리 — MATCHED면 폴링을 멈추고 OnMatchFound 브로드캐스트.

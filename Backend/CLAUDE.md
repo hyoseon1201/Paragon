@@ -53,10 +53,10 @@ com.p1.backend
 | `service/AuthService` (signup/login) | 완료 | jBCrypt 해싱/검증 |
 | `controller/AuthController` | 완료 | `POST /api/auth/signup`(201/409), `POST /api/auth/login`(200/401) |
 | `interceptor/JwtAuthInterceptor` + `config/WebConfig` | 완료 | `/api/match/**`만 보호, `Authorization: Bearer <token>` 검증 |
-| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(현재 2) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정 |
-| `controller/MatchController` | 완료 | `POST /api/match/queue`, `GET /api/match/status` |
+| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(현재 2) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정. `joinQueue()`/`leaveQueue()` 둘 다 `synchronized`(같은 인스턴스 락 공유)라 동시 요청도 순차적으로 처리됨 — curl로 검증(대기 중이던 1명에 2명이 거의 동시에 합류해도 먼저 락을 잡은 쪽이 매칭되고 나머지는 대기). `leaveQueue()`는 이미 매칭된 유저에겐 취소를 거부하고 그대로 MATCHED를 반환(레이스 컨디션 방지) — 이것도 curl로 검증됨 |
+| `controller/MatchController` | 완료 | `POST /api/match/queue`, `POST /api/match/leave`, `GET /api/match/status` |
 | 컴파일 검증 | 완료 | `./mvnw compile` 성공 |
-| **MySQL 기동 후 curl 엔드투엔드 검증** | **미완료** | Docker는 사용자가 직접 관리 — MySQL 띄운 뒤 signup×2 → login×2 → queue×2로 `MATCHED` 확인 필요 |
+| MySQL 기동 후 curl 엔드투엔드 검증 | 완료 | signup×2→login×2→queue×2(WAITING→MATCHED, 대기 중이던 유저도 재조회 시 MATCHED)+에러 경로(409/401/401) 확인. 이후 `leaveQueue` 추가분도 별도 검증: 혼자 참가 후 이탈→NOT_QUEUED, 매칭 성사 후 이탈 시도→취소 거부되고 MATCHED 유지 |
 | 언리얼 PreGame 연동 (HTTP 클라이언트, 로그인/큐 UI) | 미완료 | `P1/` 저장소 쪽 작업, 별도 진행 중 |
 
 ## 다음 작업 예정

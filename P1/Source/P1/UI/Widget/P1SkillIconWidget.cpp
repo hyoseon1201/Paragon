@@ -4,6 +4,7 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
+#include "Components/Widget.h"
 #include "Engine/Texture2D.h"
 #include "P1.h"
 
@@ -23,6 +24,19 @@ void UP1SkillIconWidget::NativeConstruct()
 	if (CooldownText)
 	{
 		CooldownText->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	// 초기 상태는 항상 숨김 — 컨트롤러가 실제 투자 가능 여부를 알려주면(OnAbilityInvestStateChanged)
+	// 그때 SetInvestButtonVisible이 켠다. 투자 불가 슬롯(LMB/Passive)은 애초에 그 브로드캐스트를
+	// 받지 않으므로 계속 숨김 상태로 남는다. Collapsed가 아니라 Hidden을 쓰는 이유: InvestButton이
+	// VerticalBox에서 아이콘 위 칸을 차지하는 구조라, Collapsed(레이아웃 공간까지 제거)를 쓰면 숨겨질
+	// 때마다 아이콘이 위로 밀려 올라간다 — Hidden은 안 보이기만 하고 공간은 그대로 유지해 위치가 고정된다.
+	UE_LOG(LogP1, Log, TEXT("[SkillIconWidget] NativeConstruct on %s | InvestButton 바인딩=%s"),
+		*GetName(), InvestButton ? TEXT("O") : TEXT("X(WBP에서 이름이 정확히 'InvestButton'인지 확인)"));
+
+	if (InvestButton)
+	{
+		InvestButton->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 
@@ -84,7 +98,9 @@ void UP1SkillIconWidget::ClearCooldown()
 
 	if (SkillIconImage)
 	{
-		SkillIconImage->SetColorAndOpacity(ReadyTint);
+		// 잠긴(미투자) 어빌리티는 쿨다운이 풀려도 계속 어둡게 유지 — 실전에서는 잠긴 어빌리티가
+		// 애초에 쿨다운을 탈 수 없어 겹칠 일이 없지만 방어적으로 체크.
+		SkillIconImage->SetColorAndOpacity(bIsLocked ? CooldownTint : ReadyTint);
 	}
 	if (CooldownOverlay)
 	{
@@ -111,6 +127,28 @@ void UP1SkillIconWidget::UpdateCooldownDisplay()
 	{
 		CooldownText->SetText(FText::FromString(FormatCooldown(RemainingCooldown)));
 		CooldownText->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
+void UP1SkillIconWidget::SetInvestButtonVisible(bool bVisible)
+{
+	if (InvestButton)
+	{
+		// SelfHitTestInvisible — 순수 표시기라 클릭을 받을 필요가 없고, 마우스 입력을 가로채면 안 된다.
+		// Collapsed가 아니라 Hidden — 레이아웃 공간을 유지해 꺼질 때 스킬 아이콘이 위로 밀리지 않게 한다.
+		InvestButton->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+	}
+}
+
+void UP1SkillIconWidget::SetLocked(bool bLocked)
+{
+	bIsLocked = bLocked;
+
+	// 쿨다운 중엔 쿨다운 쪽 틴트가 우선(어차피 같은 CooldownTint라 결과는 같지만, 진행 중인 쿨다운
+	// 타이머 로직(NativeTick/UpdateCooldownDisplay)을 건드리지 않기 위해 여기서 색만 갈아끼운다).
+	if (SkillIconImage && !bOnCooldown)
+	{
+		SkillIconImage->SetColorAndOpacity(bIsLocked ? CooldownTint : ReadyTint);
 	}
 }
 

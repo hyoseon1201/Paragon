@@ -30,6 +30,23 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TObjectPtr<UTexture2D> AbilityIcon;
 
+	// 스킬 포인트로 투자 가능한 최대 레벨(FGameplayAbilitySpec::Level 기준). 기본값 1 = 투자 불가
+	// (기본공격/패시브 등 — 시작부터 이미 최대 레벨이라 투자 버튼이 뜰 일이 없다). 투자 가능한
+	// 어빌리티(RMB/Q/E는 5, R은 3)는 BP에서 이 값을 설정한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Leveling")
+	int32 MaxAbilityLevel = 1;
+
+	// 인덱스 i = "스펙 레벨을 (i+1)로 올리는 데 필요한 최소 캐릭터 레벨". 예: RMB/Q/E처럼 캐릭터 레벨
+	// 제한이 아예 없는 어빌리티는 빈 배열로 두면 된다(범위를 벗어난 인덱스는 항상 1=제한없음 취급).
+	// R(궁극기)처럼 6/11/15 레벨에 한 랭크씩 풀리는 경우 {6, 11, 15}로 BP에서 설정한다.
+	// MaxAbilityLevel<=1(투자 불가 어빌리티)에는 아무 의미가 없다.
+	UPROPERTY(EditDefaultsOnly, Category = "Leveling")
+	TArray<int32> RequiredCharacterLevelPerRank;
+
+	// CurrentSpecLevel(0=미투자)에서 다음 랭크로 올리는 데 필요한 최소 캐릭터 레벨.
+	// RequiredCharacterLevelPerRank가 비어있거나 해당 인덱스가 없으면 1(제한 없음)을 반환.
+	int32 GetRequiredCharacterLevelForNextRank(int32 CurrentSpecLevel) const;
+
 	// true면 AP1HeroCharacter::AddDefaultAbilities()가 GiveAbility 대신 GiveAbilityAndActivateOnce로
 	// 부여해 그 즉시 1회 활성화한다 — 입력도 트리거 이벤트도 없이 부여되자마자 스스로 계속 돌아야 하는
 	// 상시 패시브(Stoicism Vitality 등)용. 입력 바인딩이 있거나 이벤트로 트리거되는 어빌리티는 false(기본값).
@@ -41,6 +58,13 @@ public:
 	// 기본공격처럼 "진짜 쿨다운은 없지만 UI에는 타이머를 보여주고 싶은" 경우 오버라이드해서 별도 태그를
 	// 반환하면 된다 — CooldownGameplayEffectClass를 건드리지 않으므로 발동 차단에는 영향이 없다.
 	virtual FGameplayTag GetUICooldownTag() const;
+
+	// 투자 가능한(MaxAbilityLevel>1) 어빌리티는 스펙 Level이 0(=아직 포인트 미투자)이면 발동 자체를
+	// 막는다 — 1레벨에 좌클릭/패시브만 쓸 수 있고 나머지는 첫 포인트를 투자해야 열리는 요구사항.
+	// 투자 불가 어빌리티(MaxAbilityLevel<=1, 좌클릭/패시브 등)는 이 체크를 완전히 건너뛴다.
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 protected:
 	AP1CharacterBase* GetP1CharacterFromActorInfo() const;

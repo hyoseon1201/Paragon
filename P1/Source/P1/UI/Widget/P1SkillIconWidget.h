@@ -9,6 +9,7 @@
 class UImage;
 class UTextBlock;
 class UProgressBar;
+class UWidget;
 
 // 사각형 스킬 아이콘. 쿨타임 비주얼은 2개 레이어로 구성:
 // 1) SkillIconImage 자체의 Tint - 준비완료면 ReadyTint(기본 흰색), 쿨타임중이면 CooldownTint(기본 0.3 어둡게)
@@ -33,6 +34,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "SkillIcon")
 	void ClearCooldown();
 
+	// 포인트 투자 가능 표시(InvestButton, WBP에 배치 안 하면 그냥 무시됨) 노출 여부.
+	// 투자는 클릭이 아니라 Ctrl+스킬키로 이뤄지므로(AP1PlayerController 참고) 이건 순수 시각적
+	// 인디케이터일 뿐 — 클릭 이벤트를 받지 않는다. 투자 가능한 4개 슬롯(RMB/Q/E/R)에만 WBP에서 배치.
+	UFUNCTION(BlueprintCallable, Category = "SkillIcon")
+	void SetInvestButtonVisible(bool bVisible);
+
+	// 어빌리티 레벨이 0(아직 포인트 미투자)이면 SkillIconImage에 CooldownTint를 적용해 쿨다운처럼
+	// 어둡게 표시한다 — 잠긴 상태라는 걸 시각적으로 알려준다. 잠금 해제(투자)되면 ReadyTint로 복귀
+	// (단, 마침 쿨다운 중이면 그쪽이 우선 — 잠긴 어빌리티는 애초에 쿨다운을 탈 수 없으니 실전에서 겹칠 일은 없음).
+	UFUNCTION(BlueprintCallable, Category = "SkillIcon")
+	void SetLocked(bool bLocked);
+
 	// 준비완료 상태의 SkillIconImage Tint
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SkillIcon")
 	FLinearColor ReadyTint = FLinearColor::White;
@@ -53,6 +66,12 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> CooldownText;
 
+	// 스킬 아이콘 위쪽(y좌표가 더 작은 쪽)에 배치하는 순수 시각적 표시기 — 어떤 UWidget 타입이든
+	// 무방(UButton으로 만들었어도 클릭은 안 씀, 그냥 Visibility만 켜고 끔). 투자 가능한 4개 슬롯에만
+	// WBP에 배치할 것 — 없는 슬롯(LMB/Passive)은 SetInvestButtonVisible이 그냥 조용히 무시된다.
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> InvestButton;
+
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
@@ -63,4 +82,5 @@ private:
 	float TotalCooldownTime = 0.f;
 	float RemainingCooldown = 0.f;
 	bool bOnCooldown = false;
+	bool bIsLocked = false;
 };

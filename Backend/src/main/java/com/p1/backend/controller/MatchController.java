@@ -24,6 +24,11 @@ public class MatchController {
         return matchmakingService.joinQueue(resolveUsername(request));
     }
 
+    @PostMapping("/leave")
+    public MatchStatusResponse leaveQueue(HttpServletRequest request) {
+        return matchmakingService.leaveQueue(resolveUsername(request));
+    }
+
     @GetMapping("/status")
     public MatchStatusResponse status(HttpServletRequest request) {
         return matchmakingService.getStatus(resolveUsername(request));

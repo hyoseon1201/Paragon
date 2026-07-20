@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/HUD/P1HUDWidget.h"
+#include "UI/Widget/P1HUDWidget.h"
 #include "UI/WidgetController/P1OverlayWidgetController.h"
 #include "UI/Widget/P1SegmentedBarWidget.h"
 #include "AbilitySystem/P1GameplayTags.h"
@@ -22,6 +22,8 @@ void UP1HUDWidget::OnWidgetControllerSet()
 	Controller->OnAbilityIconAssigned.AddDynamic(this, &UP1HUDWidget::OnAbilityIconAssigned);
 	Controller->OnCooldownStart.AddDynamic(this, &UP1HUDWidget::OnCooldownStart);
 	Controller->OnCooldownClear.AddDynamic(this, &UP1HUDWidget::OnCooldownClear);
+	Controller->OnAbilityInvestStateChanged.AddDynamic(this, &UP1HUDWidget::OnAbilityInvestStateChanged);
+	Controller->OnAbilityLockedStateChanged.AddDynamic(this, &UP1HUDWidget::OnAbilityLockedStateChanged);
 
 	Controller->OnLevelChanged.AddDynamic(this, &UP1HUDWidget::OnLevelChanged);
 	Controller->OnKDAChanged.AddDynamic(this, &UP1HUDWidget::OnKDAChanged);
@@ -47,6 +49,22 @@ void UP1HUDWidget::OnAbilityIconAssigned(FGameplayTag InputTag, UTexture2D* Icon
 	if (SkillIcon)
 	{
 		SkillIcon->SetSkillIcon(Icon);
+	}
+}
+
+void UP1HUDWidget::OnAbilityInvestStateChanged(FGameplayTag InputTag, bool bCanInvest)
+{
+	if (UP1SkillIconWidget* SkillIcon = GetSkillIconForInputTag(InputTag))
+	{
+		SkillIcon->SetInvestButtonVisible(bCanInvest);
+	}
+}
+
+void UP1HUDWidget::OnAbilityLockedStateChanged(FGameplayTag InputTag, bool bLocked)
+{
+	if (UP1SkillIconWidget* SkillIcon = GetSkillIconForInputTag(InputTag))
+	{
+		SkillIcon->SetLocked(bLocked);
 	}
 }
 

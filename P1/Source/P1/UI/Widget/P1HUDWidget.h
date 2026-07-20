@@ -89,6 +89,10 @@ private:
 	void OnCooldownStart(FGameplayTag InputTag, float Duration);
 	UFUNCTION()
 	void OnCooldownClear(FGameplayTag InputTag);
+	UFUNCTION()
+	void OnAbilityInvestStateChanged(FGameplayTag InputTag, bool bCanInvest);
+	UFUNCTION()
+	void OnAbilityLockedStateChanged(FGameplayTag InputTag, bool bLocked);
 
 	// ---- 좌하단 플레이어 정보 ----
 	UFUNCTION()

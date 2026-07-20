@@ -10,8 +10,6 @@
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
-class AP1HUD;
-class UAbilitySystemComponent;
 
 UCLASS()
 class P1_API AP1PlayerController : public APlayerController
@@ -21,10 +19,6 @@ class P1_API AP1PlayerController : public APlayerController
 public:
 	AP1PlayerController();
 
-	// 소유 클라이언트(또는 리슨서버 로컬 플레이어)에서 HUD를 생성하고 ASC에 바인딩.
-	// AP1HeroCharacter::InitAbilityActorInfo에서 IsLocallyControlled() 시 호출된다.
-	void CreateHUDForASC(UAbilitySystemComponent* InASC);
-
 	// 클라이언트가 접속 시 선택한 캐릭터 클래스.
 	// TODO: AP1ArenaGameMode::Login()에서 URL Options를 파싱해 설정.
 	//       현재는 null → GetDefaultPawnClassForController가 GameMode 기본값을 사용.
@@ -32,6 +26,7 @@ public:
 	TSubclassOf<APawn> SelectedCharacterClass;
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

@@ -17,6 +17,12 @@ public:
 	void AbilityInputTagPressed(const FGameplayTag& InputTag);
 	void AbilityInputTagReleased(const FGameplayTag& InputTag);
 
+	// 스킬 아이콘의 "포인트 투자" 버튼 클릭 → 이 InputTag를 가진 어빌리티 스펙의 Level을 1 올리고
+	// PlayerState의 SkillPoints를 1 소비한다. 이미 최대 레벨(UP1GameplayAbility::MaxAbilityLevel)이거나
+	// 남은 포인트가 없으면 조용히 무시(서버 권위 검증 — 버튼 Visibility는 클라이언트 UI 힌트일 뿐 신뢰 안 함).
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerInvestSkillPoint(FGameplayTag AbilityInputTag);
+
 	// AP1HeroCharacter::AddDefaultAbilities()가 서버에서 어빌리티 부여를 마치면 호출한다.
 	// bAbilitiesGiven을 리플리케이트해 원격 클라이언트도 "내 어빌리티 스펙이 실제로 도착한 시점"을
 	// 알 수 있게 한다 — 스킬 아이콘 UI처럼 GetActivatableAbilities()가 채워진 후에만 조립 가능한

@@ -2,6 +2,8 @@
 
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "AbilitySystem/P1GameplayAbility.h"
+#include "Player/P1PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "P1.h"
 
@@ -90,6 +92,57 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 	{
 		UE_LOG(LogP1, Warning, TEXT("[ASC] No spec found matching InputTag: %s"), *InputTag.ToString());
 	}
+}
+
+bool UP1AbilitySystemComponent::ServerInvestSkillPoint_Validate(FGameplayTag AbilityInputTag)
+{
+	return AbilityInputTag.IsValid();
+}
+
+void UP1AbilitySystemComponent::ServerInvestSkillPoint_Implementation(FGameplayTag AbilityInputTag)
+{
+	AP1PlayerState* PS = Cast<AP1PlayerState>(GetOwnerActor());
+	if (!IsValid(PS) || PS->GetSkillPoints() <= 0)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[ASC][Invest] ServerInvestSkillPoint: 남은 스킬 포인트 없음 — %s"), *AbilityInputTag.ToString());
+		return;
+	}
+
+	for (FGameplayAbilitySpec& Spec : GetActivatableAbilities())
+	{
+		if (!Spec.Ability || !Spec.GetDynamicSpecSourceTags().HasTagExact(AbilityInputTag))
+		{
+			continue;
+		}
+
+		const UP1GameplayAbility* AbilityCDO = Cast<UP1GameplayAbility>(Spec.Ability);
+		const int32 MaxLevel = AbilityCDO ? AbilityCDO->MaxAbilityLevel : 1;
+		if (Spec.Level >= MaxLevel)
+		{
+			UE_LOG(LogP1, Warning, TEXT("[ASC][Invest] ServerInvestSkillPoint: 이미 최대 레벨(%d) — %s"), MaxLevel, *AbilityInputTag.ToString());
+			return;
+		}
+
+		// R처럼 특정 캐릭터 레벨(6/11/15 등)에 도달해야 다음 랭크가 풀리는 어빌리티 — 포인트가 있고
+		// 아직 최대 레벨이 아니어도 이 조건을 통과 못하면 투자할 수 없다.
+		const int32 RequiredCharacterLevel = AbilityCDO ? AbilityCDO->GetRequiredCharacterLevelForNextRank(Spec.Level) : 1;
+		if (PS->GetCharacterLevel() < RequiredCharacterLevel)
+		{
+			UE_LOG(LogP1, Warning, TEXT("[ASC][Invest] ServerInvestSkillPoint: 캐릭터 레벨 부족(필요=%d, 현재=%d) — %s"),
+				RequiredCharacterLevel, PS->GetCharacterLevel(), *AbilityInputTag.ToString());
+			return;
+		}
+
+		Spec.Level += 1;
+		MarkAbilitySpecDirty(Spec);
+		PS->SpendSkillPoint();
+
+		UE_LOG(LogP1, Log, TEXT("[ASC][Invest] 포인트 투자 — %s → Level %d (남은 SkillPoints=%d)"),
+			*AbilityInputTag.ToString(), Spec.Level, PS->GetSkillPoints());
+		return;
+	}
+
+	UE_LOG(LogP1, Warning, TEXT("[ASC][Invest] ServerInvestSkillPoint: 매칭되는 어빌리티 스펙 없음 — %s"), *AbilityInputTag.ToString());
 }
 
 void UP1AbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& InputTag)

@@ -30,6 +30,16 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Minion)
 // 무적 상태 — 전 어빌리티 공용(스테이시스/무적기 등). UP1AttributeSet이 Damage 처리 시 이 태그가 있으면 데미지를 무시한다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Invulnerable)
 
+// --- CC(기절) — 전 캐릭터/전 어빌리티 공용 ---
+// 기절 GE(GE_Debuff_Stun 등)가 부여하는 태그. 베이스 UP1GameplayAbility의 ActivationBlockedTags에
+// 포함되어 있어 기절 중엔 대부분의 어빌리티가 발동 차단된다(기절 해제용 스킬만 자기 생성자에서
+// ActivationBlockedTags.RemoveTag로 예외 처리). 이동(WASD)은 어빌리티가 아니라 AP1PlayerController::
+// HandleMove()가 직접 이 태그를 체크해서 막는다(Enhanced Input이라 ActivationBlockedTags를 안 거침).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stunned)
+// 기절 GE의 Duration SetByCaller 채널 — 소스마다 기절 시간이 다르므로(예: 거리 비례 스케일) 공유 GE
+// 하나를 여러 어빌리티가 값만 다르게 넣어 재사용한다(Data.CooldownDuration과 동일한 패턴).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_StunDuration)
+
 // --- 사망/리스폰 (전 캐릭터 공용) ---
 // Health<=0 감지 시 UP1AttributeSet이 부여하는 Duration GE의 태그 — 전 어빌리티 공통 ActivationBlockedTags에도
 // 걸려있어 사망 중엔 어떤 어빌리티도 발동 불가. GE 자체가 자연 만료되는 시점이 곧 리스폰 시점이다.

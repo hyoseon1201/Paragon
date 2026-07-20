@@ -20,7 +20,7 @@ class P1_API AP1HUD : public AHUD
 public:
 	UP1OverlayWidgetController* GetOverlayWidgetController(const FWidgetControllerParams& WCParams);
 
-	// AP1PlayerController::CreateHUDForASC 에서 호출.
+	// AP1HeroCharacter::HandleAbilitySystemReady 에서 호출.
 	void InitOverlay(APlayerController* PC, APlayerState* PS, UAbilitySystemComponent* ASC, UAttributeSet* AS);
 
 private:

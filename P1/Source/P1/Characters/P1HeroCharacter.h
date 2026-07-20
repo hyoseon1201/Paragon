@@ -14,6 +14,7 @@ class UP1HeroComponent;
 class UMotionWarpingComponent;
 class UAnimMontage;
 class UCurveTable;
+class AP1PlayerState;
 struct FGameplayEventData;
 
 UCLASS()
@@ -110,7 +111,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Death")
 	TObjectPtr<UAnimMontage> DeathMontage;
 
-	void InitAbilityActorInfo();
+	// 기절 지속시간 내내 반복 재생할 몽타주(에셋 자체를 Loop로 설정) — DeathMontage와 동일한 패턴으로
+	// 영웅마다 다른 애셋을 지정. State.Stunned 태그가 사라지는 순간(OnStunTagChanged) 정지한다.
+	UPROPERTY(EditDefaultsOnly, Category = "CC")
+	TObjectPtr<UAnimMontage> StunMontage;
+
+	// PossessedBy(서버)/OnRep_PlayerState(클라) 양쪽에서 호출되는 오케스트레이터 — "ASC를 쓸 수 있게
+	// 된 시점에 캐릭터가 해야 할 일 전체"를 순서대로 실행한다(GAS 와이어링, 사망/코스메틱 이벤트 구독,
+	// 권위 전용 베이스스탯 적용, 로컬 전용 UI 생성). PossessedBy/OnRep_PlayerState가 이 이름을 직접
+	// 호출하는 이유: 이 함수 하나가 "지금 이 시점에 ASC가 유효하다"는 계약을 보장하는 유일한 지점이라서다.
+	void HandleAbilitySystemReady();
+
+	// GAS ASC 와이어링 + 캐싱만 담당 — 이름 그대로 좁게 유지(다른 캐릭터 초기화 로직과 섞지 않음).
+	void InitAbilityActorInfo(AP1PlayerState* P1PS, UAbilitySystemComponent* ASC);
+
 	void AddDefaultAbilities();
 	void BindMoveSpeedAttribute();
 
@@ -126,6 +140,11 @@ protected:
 	// State.Dead 태그 카운트 변경(GAS 태그 복제로 모든 클라이언트에서 호출됨) — 부여 시 코스메틱 반응
 	// (입력 차단, 사망 몽타주), 제거(GE 자연 만료) 시 서버에서 RestartPlayer + 자신 Destroy.
 	void OnDeadTagChanged(FGameplayTag Tag, int32 NewCount);
+
+	// State.Stunned 태그 카운트 변경 — OnDeadTagChanged와 동일한 패턴. 부여 시 이동 입력 차단(어빌리티
+	// 발동 차단은 이미 베이스 어빌리티의 ActivationBlockedTags가 처리하므로 여기선 이동만 신경 쓰면 됨)
+	// + StunMontage 반복 재생, 제거 시 입력 복구 + 몽타주 정지.
+	void OnStunTagChanged(FGameplayTag Tag, int32 NewCount);
 
 	// DeathMontage의 착지 프레임(UP1AnimNotify_SendGameplayEvent, Event.Montage.Death.Impact)에서
 	// 발신되는 이벤트 수신 — 래그돌 전환을 트리거한다. 태그 이벤트와 동일하게 각 클라이언트가

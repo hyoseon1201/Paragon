@@ -6,6 +6,7 @@
 #include "Player/P1PlayerController.h"
 #include "Player/P1PlayerState.h"
 #include "GameplayEffect.h"
+#include "AbilitySystemComponent.h"
 
 UP1GameplayAbility::UP1GameplayAbility()
 {
@@ -25,6 +26,10 @@ UP1GameplayAbility::UP1GameplayAbility()
 
 	// 사망 중엔 어떤 어빌리티도 발동 불가 (State.Dead GE가 자연 만료되면 곧 리스폰).
 	ActivationBlockedTags.AddTag(TAG_State_Dead);
+
+	// 기절 중엔 대부분의 어빌리티 발동 불가 — 기절 해제용 스킬은 Stoicism이 State.Attacking을 뺐던 것과
+	// 동일한 방식으로 자기 생성자에서 ActivationBlockedTags.RemoveTag(TAG_State_Stunned)로 예외 처리한다.
+	ActivationBlockedTags.AddTag(TAG_State_Stunned);
 }
 
 AP1CharacterBase* UP1GameplayAbility::GetP1CharacterFromActorInfo() const
@@ -55,6 +60,37 @@ FGameplayTag UP1GameplayAbility::GetUICooldownTag() const
 		}
 	}
 	return FGameplayTag();
+}
+
+int32 UP1GameplayAbility::GetRequiredCharacterLevelForNextRank(int32 CurrentSpecLevel) const
+{
+	if (RequiredCharacterLevelPerRank.IsValidIndex(CurrentSpecLevel))
+	{
+		return RequiredCharacterLevelPerRank[CurrentSpecLevel];
+	}
+	return 1;
+}
+
+bool UP1GameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	if (MaxAbilityLevel > 1 && ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
+	{
+		if (const FGameplayAbilitySpec* Spec = ActorInfo->AbilitySystemComponent->FindAbilitySpecFromHandle(Handle))
+		{
+			if (Spec->Level <= 0)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 FActiveGameplayEffectHandle UP1GameplayAbility::ApplyEffectToSelf(TSubclassOf<UGameplayEffect> EffectClass,
