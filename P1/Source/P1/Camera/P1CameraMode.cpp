@@ -4,6 +4,9 @@
 #include "Camera/P1CameraComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
+#include "Engine/World.h"
+#include "CollisionQueryParams.h"
+#include "CollisionShape.h"
 
 // ─── FP1CameraModeView ────────────────────────────────────────────────────────
 
@@ -75,10 +78,56 @@ void UP1CameraMode::UpdateView(float DeltaTime)
 	const FVector  PivotLocation = GetPivotLocation();
 	const FRotator PivotRotation = GetPivotRotation();
 
-	View.Location       = PivotLocation + PivotRotation.RotateVector(ViewOffset);
+	FVector DesiredLocation = PivotLocation + PivotRotation.RotateVector(ViewOffset);
+
+	if (bPreventPenetration)
+	{
+		PreventCameraPenetration(PivotLocation, DesiredLocation, DeltaTime);
+	}
+
+	View.Location       = DesiredLocation;
 	View.Rotation       = PivotRotation;
 	View.ControlRotation = PivotRotation;
 	View.FieldOfView    = FieldOfView;
+}
+
+void UP1CameraMode::PreventCameraPenetration(const FVector& PivotLocation, FVector& InOutCameraLocation, float DeltaTime)
+{
+	const AActor* TargetActor = GetTargetActor();
+	UWorld* World = TargetActor ? TargetActor->GetWorld() : nullptr;
+	if (!World)
+	{
+		return;
+	}
+
+	const FVector DesiredLocation = InOutCameraLocation;
+	const float DesiredDistance = FVector::Dist(PivotLocation, DesiredLocation);
+	if (DesiredDistance < KINDA_SMALL_NUMBER)
+	{
+		CurrentPenetrationPullback = 0.f;
+		return;
+	}
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(TargetActor);
+
+	FHitResult Hit;
+	const bool bBlocked = World->SweepSingleByChannel(Hit, PivotLocation, DesiredLocation, FQuat::Identity,
+		PenetrationCollisionChannel, FCollisionShape::MakeSphere(PenetrationProbeSize), Params);
+
+	// Hit.Distance = 스윕 시작점(피벗)에서 첫 충돌까지의 거리 — 원하는 거리에서 이만큼을 빼면 안전하게
+	// 당겨야 할 거리가 나온다.
+	const float TargetPullback = bBlocked ? FMath::Max(DesiredDistance - Hit.Distance, 0.f) : 0.f;
+
+	// 당겨질 땐 빠르게(파고드는 프레임 최소화), 풀릴 땐 느리게(팝핑 방지) — 서로 다른 속도로 보간.
+	const float InterpSpeed = (TargetPullback > CurrentPenetrationPullback) ? PenetrationPullInSpeed : PenetrationPushOutSpeed;
+	CurrentPenetrationPullback = FMath::FInterpConstantTo(CurrentPenetrationPullback, TargetPullback, DeltaTime, InterpSpeed);
+
+	if (CurrentPenetrationPullback > KINDA_SMALL_NUMBER)
+	{
+		const FVector PullDirection = (PivotLocation - DesiredLocation).GetSafeNormal();
+		InOutCameraLocation = DesiredLocation + PullDirection * CurrentPenetrationPullback;
+	}
 }
 
 void UP1CameraMode::UpdateBlending(float DeltaTime)

@@ -34,8 +34,12 @@ public:
 	FOnProjectileHitSignature OnProjectileHit;
 
 	// 스폰 직후 어빌리티가 호출 — 속도/충돌 반경/최대 사거리를 주입한다. MaxRange<=0이면 사거리 제한
-	// 없이 InitialLifeSpan(생성자에서 설정된 안전장치)으로만 소멸한다.
-	void InitializeProjectile(float Speed, float InMaxRange, float Radius = 15.0f);
+	// 없이 InitialLifeSpan(생성자에서 설정된 안전장치)으로만 소멸한다. InGravityScale은 기본값 0(직선
+	// 논타겟 스킬샷, RangedAttack/Ionizer 등)을 유지 — 곡사 투사체(Stasis Bomb 등)만 호출부에서 양수
+	// 값을 넘겨 포물선을 만든다(조준 각도 자체는 스폰 시 SpawnRotation/Velocity 방향으로 이미 반영됨).
+	// bInDrawDebugTrajectory=true면 매 틱 이동 경로를 디버그 라인으로 그린다(튕기는 경로 확인용).
+	void InitializeProjectile(float Speed, float InMaxRange, float Radius = 15.0f, float InGravityScale = 0.0f,
+		bool bInDrawDebugTrajectory = false);
 
 	// 지금까지 날아간 거리 — 거리 비례 효과(예: 사거리에 비례해 늘어나는 스턴 지속시간)에 사용.
 	float GetDistanceTraveled() const;
@@ -63,6 +67,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Projectile")
 	int32 MaxBounces = 0;
 
+	// 튕길 때 충돌 직전 속도 대비 반사 속도 비율(0~1) — MaxBounces>0일 때만 의미가 있다. 엔진 기본
+	// 바운스(Bounciness/Friction, 바닥 PhysicalMaterial과 결합)에 그대로 맡기면 각도/마찰에 따라 반사
+	// 속도가 정지 임계값 밑으로 떨어져 그 자리에 멈춰버릴 수 있어(="튕겨야 하는데 안 튕김"), 충돌
+	// 이벤트에서 우리가 직접 반사 속도를 계산해 덮어써 지형과 무관하게 항상 확실한 다음 아크를 보장한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Projectile", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float BounceRestitution = 0.6f;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -86,6 +97,15 @@ protected:
 	void OnPawnOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
 		int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
+	// ProjectileMovementComponent::OnProjectileBounce 구독 — 생성자에서 무조건 바인딩(MaxBounces와 무관,
+	// bShouldBounce가 꺼져 있으면 애초에 콜백이 안 불려서 무해함 — InitializeProjectile()로 미뤘다가
+	// 점블랭크 발사 시 pending-kill 액터에 바인딩을 시도해 크래시 나던 버그가 있었음). 엔진이 자체
+	// Bounciness/Friction으로 계산한 반사 속도를 우리가 직접 덮어써서, 정지 임계값 밑으로 떨어져 그
+	// 자리에 멈추는 것을 방지하고 항상 확실하게 다음 아크로 이어지게 한다. 엔진 주석 "Event may modify
+	// velocity or threshold, so check velocity threshold now"가 명시하는 정식 확장 지점.
+	UFUNCTION()
+	void OnProjectileBounce(const FHitResult& ImpactResult, const FVector& ImpactVelocity);
+
 	// HitEffectCascade/HitEffectNiagara를 실제로 스폰 — 서버(OnHit)에서만 호출할 것. 투사체 자신이
 	// 곧 Destroy()되므로 자신에게 부착하지 않고 그 순간의 월드 위치/노멀에 독립적으로 스폰한다
 	// (AP1CharacterBase의 Multicast 코스메틱 패턴과 동일한 이유 — 서버 단독 SpawnEmitter는 로컬+서버
@@ -104,4 +124,14 @@ private:
 
 	// 지금까지 WorldStatic/WorldDynamic에 튕긴 횟수.
 	int32 CurrentBounceCount = 0;
+
+	// 최종 폭발/소멸 브로드캐스트가 두 번 이상 나가지 않도록 하는 가드 — 콤플렉스 콜리전(스태틱메시가
+	// 여러 프리미티브로 구성된 경우 등)에 부딪히면 같은 물리 틱 안에서 OnComponentHit이 두 번 이상
+	// 발화할 수 있는데, Destroy()가 그 프레임 즉시 액터를 제거하지 못해 두 번째 호출이 Destroy() 이전에
+	// 끼어들면 OnProjectileHit이 중복 브로드캐스트된다(=폭발/데미지가 여러 번 발동하는 것처럼 보임).
+	bool bHasExploded = false;
+
+	// 디버그 궤적 라인용 — true면 Tick마다 직전 위치→현재 위치를 그린다.
+	bool bDrawDebugTrajectory = false;
+	FVector LastDebugTrajectoryLocation = FVector::ZeroVector;
 };

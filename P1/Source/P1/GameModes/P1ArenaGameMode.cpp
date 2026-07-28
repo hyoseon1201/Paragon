@@ -34,20 +34,30 @@ AActor* AP1ArenaGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	uint8 TeamId = PS->GetGenericTeamId().GetId();
 	if (TeamId == 255)
 	{
-		TeamId = static_cast<uint8>(NextTeamIndex % 2);
+		TeamId = static_cast<uint8>(NextTeamIndex % FMath::Max(1, NumTeams));
 		PS->SetGenericTeamId(FGenericTeamId(TeamId));
 		++NextTeamIndex;
 	}
 
-	const FName TargetTag = (TeamId == 0) ? FName("Team0") : FName("Team1");
+	const FName TargetTag = FName(*FString::Printf(TEXT("Team%d"), TeamId));
+
+	// 같은 태그를 가진 PlayerStart를 전부 모아서 그중 하나를 랜덤으로 고른다 — 팀원 여러 명이
+	// 전부 같은 자리 하나에 겹쳐 스폰되는 걸 막는다(팀당 PlayerStart를 여러 개 배치해뒀다는 전제).
+	TArray<APlayerStart*> MatchingStarts;
 	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
 	{
 		if ((*It)->PlayerStartTag == TargetTag)
 		{
-			UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] %s → Team %d → PlayerStart '%s'"),
-				*Player->GetName(), TeamId, *TargetTag.ToString());
-			return *It;
+			MatchingStarts.Add(*It);
 		}
+	}
+
+	if (MatchingStarts.Num() > 0)
+	{
+		APlayerStart* Chosen = MatchingStarts[FMath::RandHelper(MatchingStarts.Num())];
+		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] %s → Team %d → PlayerStart '%s' (태그 일치 %d개 중 랜덤 선택)"),
+			*Player->GetName(), TeamId, *TargetTag.ToString(), MatchingStarts.Num());
+		return Chosen;
 	}
 
 	UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] PlayerStart(tag='%s') not found — falling back"), *TargetTag.ToString());

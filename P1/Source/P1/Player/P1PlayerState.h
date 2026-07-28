@@ -82,6 +82,22 @@ public:
 	void AddDeath() { ++Deaths; KillStreak = 0; if (const UWorld* World = GetWorld()) { LastDeathTime = World->GetTimeSeconds(); } OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
 	void AddAssist() { ++Assists; OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
 
+	// --- 스턴 종료 시각(머리 위 스턴바 카운트다운용) ---
+	// 서버가 스턴 적용 시 "스턴이 끝나는 서버 월드 시각"(GetWorld()->GetTimeSeconds() + 지속시간)을 여기
+	// 기록한다. 이 값은 전 클라이언트에 복제되므로(Mixed 모드에서 스턴 GE 자체는 소유자에게만 가지만 이
+	// 프로퍼티는 전원에게 감), 적을 보는 클라이언트도 `StunEndServerTime - GameState->GetServerWorldTimeSeconds()`
+	// 로 정확한 남은시간을 계산할 수 있다 — 스턴바 표시/숨김은 State.Stunned '태그'(전원 복제)가 담당하고,
+	// 이 값은 오직 카운트다운 정확도를 위해서만 쓴다. GetServerWorldTimeSeconds()는 GameState가 동기화하는
+	// 서버 시계라 서버/클라 로컬 시계 차이 문제를 피한다(GetWorld()->GetTimeSeconds()를 직접 비교하면 안 됨).
+	float GetStunEndServerTime() const { return StunEndServerTime; }
+	void SetStunEndServerTime(float NewEndServerTime);   // 서버에서만 호출
+
+	// StunEndServerTime이 클라에 도착한 순간(OnRep) 또는 서버에서 세팅된 순간에 발화 — 위젯 컨트롤러가
+	// 이걸 받아 정확한 남은시간으로 스턴바를 다시 그린다. 태그와 이 값이 서로 다른 프레임에 도착해도(순서
+	// 무보장) 각자 도착 시점에 RefreshStun을 트리거해 마지막엔 정확한 상태로 수렴하게 하는 게 핵심.
+	DECLARE_MULTICAST_DELEGATE(FOnStunTimeChangedNative);
+	FOnStunTimeChangedNative OnStunTimeChangedNative;
+
 	// --- 상점 / 인벤토리 ---
 	// 아이템 정의(가격/이름/아이콘)는 ShopItemTable(DataTable, Row=FP1ShopItemData)에 데이터로만
 	// 존재 — 별도 "상점" 액터/매니저는 없다(칼바람처럼 벤더별로 다른 재고가 있는 게 아니라 어디서든
@@ -133,6 +149,13 @@ protected:
 
 	UPROPERTY(Replicated)
 	int32 KillStreak = 0;
+
+	// 스턴이 끝나는 서버 월드 시각(위 GetStunEndServerTime() 주석 참고). 전원에게 복제.
+	UPROPERTY(ReplicatedUsing = OnRep_StunEndServerTime)
+	float StunEndServerTime = 0.0f;
+
+	UFUNCTION()
+	void OnRep_StunEndServerTime() { OnStunTimeChangedNative.Broadcast(); }
 
 	UFUNCTION()
 	void OnRep_CharacterLevel() { OnCharacterLevelChangedNative.Broadcast(CharacterLevel); }

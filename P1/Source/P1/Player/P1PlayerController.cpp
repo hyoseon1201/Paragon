@@ -10,6 +10,7 @@
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"
+#include "UI/P1DamageNumberActor.h"
 #include "P1.h"
 
 AP1PlayerController::AP1PlayerController()
@@ -90,11 +91,13 @@ void AP1PlayerController::HandleMove(const FInputActionValue& Value)
 
 	// 이동은 어빌리티가 아니라 Enhanced Input이 직접 처리하는 경로라 베이스 어빌리티의
 	// ActivationBlockedTags(State.Stunned 포함)를 안 거친다 — 여기서 직접 태그를 체크해야 막힌다.
+	// State.Rooted는 캐스팅 중 이동을 막고 싶은 어빌리티(Photon Disruptor 등)가 자기 ActivationOwnedTags에
+	// 얹는 범용 태그 — 새 어빌리티가 이동 차단이 필요해도 이 함수를 다시 손댈 필요 없이 그 태그만 추가하면 된다.
 	if (const AP1CharacterBase* P1Character = Cast<AP1CharacterBase>(ControlledCharacter))
 	{
 		if (const UAbilitySystemComponent* ASC = P1Character->GetAbilitySystemComponent())
 		{
-			if (ASC->HasMatchingGameplayTag(TAG_State_Stunned))
+			if (ASC->HasMatchingGameplayTag(TAG_State_Stunned) || ASC->HasMatchingGameplayTag(TAG_State_Rooted))
 			{
 				return;
 			}
@@ -129,15 +132,21 @@ void AP1PlayerController::HandleJumpStarted(const FInputActionValue& Value)
 		return;
 	}
 
-	if (const AP1CharacterBase* P1Character = Cast<AP1CharacterBase>(ControlledCharacter))
+	AP1CharacterBase* P1Character = Cast<AP1CharacterBase>(ControlledCharacter);
+	UP1AbilitySystemComponent* ASC = P1Character ? Cast<UP1AbilitySystemComponent>(P1Character->GetAbilitySystemComponent()) : nullptr;
+	if (ASC && ASC->HasMatchingGameplayTag(TAG_State_Stunned))
 	{
-		if (const UAbilitySystemComponent* ASC = P1Character->GetAbilitySystemComponent())
-		{
-			if (ASC->HasMatchingGameplayTag(TAG_State_Stunned))
-			{
-				return;
-			}
-		}
+		return;
+	}
+
+	// 이미 공중(낙하 중)이면 일반 점프 대신 공중 패시브(예: Dekker의 Rocket Boots)를 시도한다 —
+	// InputTag.Ability.Passive를 가진 어빌리티가 없는 영웅은 AbilityInputTagPressed가 아무것도 못
+	// 찾아 조용히 무시되므로(원래 IsFalling() 상태의 Jump() 재호출도 JumpMaxCount=1이라 아무 효과가
+	// 없었던 것과 동일하게) 별도 폴백 없이 안전하다.
+	if (ASC && ControlledCharacter->GetCharacterMovement() && ControlledCharacter->GetCharacterMovement()->IsFalling())
+	{
+		ASC->AbilityInputTagPressed(TAG_InputTag_Ability_Passive);
+		return;
 	}
 
 	ControlledCharacter->Jump();
@@ -183,11 +192,40 @@ void AP1PlayerController::HandleAbilityInputPressed(FGameplayTag InputTag)
 
 void AP1PlayerController::HandleAbilityInputReleased(FGameplayTag InputTag)
 {
+	// Enhanced Input의 Completed 이벤트가 실제 키 릴리즈보다 먼저(예: IA 트리거 설정이 Down이 아니라
+	// Pressed 등으로 잘못돼 있으면) 발화하는지 확인하기 위한 진단 로그 — HandleAbilityInputPressed는
+	// 이미 찍고 있는데 Released 쪽엔 하나도 없어서 "홀드 중 어빌리티가 갑자기 끝남" 재현 시 이 로그가
+	// Pressed 로그 직후 곧바로(같은 프레임/다음 틱) 찍히는지가 Enhanced Input 레이어 문제인지 판별 포인트.
+	UE_LOG(LogP1, Log, TEXT("[Input] AbilityInputReleased: %s"), *InputTag.ToString());
+
 	if (AP1CharacterBase* P1Character = GetPawn<AP1CharacterBase>())
 	{
 		if (UP1AbilitySystemComponent* ASC = Cast<UP1AbilitySystemComponent>(P1Character->GetAbilitySystemComponent()))
 		{
 			ASC->AbilityInputTagReleased(InputTag);
 		}
+	}
+}
+
+void AP1PlayerController::ClientShowDamageNumber_Implementation(FVector WorldLocation, float DamageAmount, bool bIsMagicalDamage)
+{
+	if (!DamageNumberActorClass)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[DamageNumber] DamageNumberActorClass 미설정 — BP_P1PlayerController에서 지정하세요."));
+		return;
+	}
+
+	// 여러 데미지가 같은 프레임에 몰려도 겹쳐 보이지 않게 살짝 랜덤 오프셋을 준다.
+	const FVector DamageNumberSpawnLocation = WorldLocation + FVector(
+		FMath::FRandRange(-20.0f, 20.0f), FMath::FRandRange(-20.0f, 20.0f), 80.0f);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	AP1DamageNumberActor* DamageNumberActor = GetWorld()->SpawnActor<AP1DamageNumberActor>(
+		DamageNumberActorClass, DamageNumberSpawnLocation, FRotator::ZeroRotator, SpawnParams);
+	if (DamageNumberActor)
+	{
+		DamageNumberActor->InitializeDamageNumber(DamageAmount, bIsMagicalDamage);
 	}
 }

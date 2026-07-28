@@ -23,6 +23,11 @@ UP1GameplayAbility_StoneForgedSoul::UP1GameplayAbility_StoneForgedSoul()
 	SetAssetTags(Tags);
 
 	InputTag = TAG_InputTag_Ability_R;
+
+	// 스테이시스 상승~착지까지 MovementMode가 Flying으로 바뀌는데, Flying은 기본적으로 WASD 입력을
+	// 그대로 받아들인다 — 이 스킬은 몽타주 루트모션이 "원래 자리로 돌아오는 왕복"을 표현하므로,
+	// 그 사이 이동 입력이 섞이면 캐릭터가 원위치를 벗어나 착지 연출/판정이 어긋난다.
+	ActivationOwnedTags.AddTag(TAG_State_Rooted);
 }
 
 void UP1GameplayAbility_StoneForgedSoul::ActivateAbility(const FGameplayAbilitySpecHandle Handle,

@@ -55,6 +55,16 @@ void AP1PlayerState::SetCharacterLevel(int32 NewLevel)
 	}
 }
 
+void AP1PlayerState::SetStunEndServerTime(float NewEndServerTime)
+{
+	if (HasAuthority())
+	{
+		StunEndServerTime = NewEndServerTime;
+		// 서버(리슨서버/호스트)에선 OnRep이 안 불리므로 여기서 직접 브로드캐스트 — CharacterLevel 등과 동일 패턴.
+		OnStunTimeChangedNative.Broadcast();
+	}
+}
+
 float AP1PlayerState::GetXPRequiredForNextLevel() const
 {
 	if (!XPToNextLevelTable)
@@ -78,6 +88,7 @@ void AP1PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AP1PlayerState, Deaths);
 	DOREPLIFETIME(AP1PlayerState, Assists);
 	DOREPLIFETIME(AP1PlayerState, KillStreak);
+	DOREPLIFETIME(AP1PlayerState, StunEndServerTime);
 	DOREPLIFETIME(AP1PlayerState, Inventory);
 }
 

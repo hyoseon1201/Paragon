@@ -72,6 +72,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "StasisBomb|Bomb")
 	float ProjectileRadius = 30.0f;
 
+	// 곡사포(포물선) 낙하 정도 — AP1Projectile 기본값(0=직선 스킬샷)을 여기서만 덮어쓴다. 발사 각도 자체는
+	// GetAimDirection()이 카메라 피치를 그대로 반영하므로, 중력만 켜주면 하늘을 보고 쏠수록 높이 뜨는(사거리는
+	// 짧아지는) 진짜 곡사 궤도가 자연히 나온다 — 값이 클수록 더 빨리 떨어짐(포물선이 짧고 급해짐).
+	UPROPERTY(EditDefaultsOnly, Category = "StasisBomb|Bomb")
+	float ProjectileGravityScale = 1.5f;
+
 	// 첫 충돌이 지형일 때 몇 번까지 튕길지 — 설명상 "1회 튕긴 뒤 다음 충돌에서 폭발"이라 기본값 1.
 	UPROPERTY(EditDefaultsOnly, Category = "StasisBomb|Bomb")
 	int32 BombMaxBounces = 1;

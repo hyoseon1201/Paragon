@@ -97,6 +97,12 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 	ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Character_HitReact).AddUObject(this, &AP1HeroCharacter::OnHitReactEventReceived);
 	ASC->RegisterGameplayTagEvent(TAG_State_HitReacting, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnHitReactTagChanged);
 
+	// 진단용 — LocalPredicted 어빌리티가 클라이언트에서 예측 활성화된 뒤 서버 authoritative 재검증에서
+	// 거부되면(쿨다운/코스트/태그 조건 등이 클라-서버 간 순간적으로 어긋난 경우) 서버가 강제로 활성화를
+	// 취소시킨다 — "홀드 중인데 어빌리티가 갑자기 끝남" 같은 증상의 유력한 원인 중 하나라 항상 로그로
+	// 남겨둔다(엔진 자체 로그는 LogAbilitySystem 카테고리라 기본 설정에 따라 안 보일 수 있음).
+	ASC->AbilityFailedCallbacks.AddUObject(this, &AP1HeroCharacter::OnAbilityActivationFailed);
+
 	// 버프 태그에 반응하는 코스메틱 이펙트(검 발광 등)가 있는 영웅이면(컴포넌트가 붙어있으면) ASC를 넘겨준다.
 	// 어떤 태그/이펙트인지는 전부 컴포넌트 쪽 데이터가 갖고 있어 이 클래스는 특정 스킬을 몰라도 된다.
 	if (UP1BuffCosmeticEffectComponent* CosmeticComp = FindComponentByClass<UP1BuffCosmeticEffectComponent>())
@@ -107,6 +113,17 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 	if (HasAuthority())
 	{
 		ApplyBaseStatsForLevel(P1PS->GetCharacterLevel(), /*bFullHeal=*/true);
+
+		if (PassiveRegenEffectClass)
+		{
+			FGameplayEffectContextHandle RegenContext = ASC->MakeEffectContext();
+			RegenContext.AddSourceObject(this);
+			const FGameplayEffectSpecHandle RegenSpecHandle = ASC->MakeOutgoingSpec(PassiveRegenEffectClass, static_cast<float>(P1PS->GetCharacterLevel()), RegenContext);
+			if (RegenSpecHandle.IsValid())
+			{
+				ASC->ApplyGameplayEffectSpecToSelf(*RegenSpecHandle.Data.Get());
+			}
+		}
 	}
 
 	BindMoveSpeedAttribute();
@@ -371,27 +388,57 @@ void AP1HeroCharacter::OnStunTagChanged(FGameplayTag Tag, int32 NewCount)
 {
 	UE_LOG(LogP1, Log, TEXT("[CC] OnStunTagChanged — NewCount=%d (%s)"), NewCount, *GetName());
 
-	UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-	if (!AnimInstance || !StunMontage)
+	// 스턴 몽타주 재생/정지 — 몽타주가 없는 영웅(Dekker 등)이면 스킵하되, 아래 서버 로직(어빌리티 취소/
+	// 스턴 종료시각 기록)까지 막지 않도록 여기서 return하지 않는다.
+	if (UAnimInstance* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
 	{
-		return;
-	}
-
-	if (NewCount > 0)
-	{
-		// 기절 지속시간이 소스마다 달라(거리 비례 스케일 등) 몽타주 길이와 정확히 안 맞을 수 있으므로,
-		// 몽타주 자체를 Loop로 만들어두고 태그가 사라질 때(NewCount==0) 정지시키는 방식으로 맞춘다.
-		AnimInstance->Montage_Play(StunMontage);
-	}
-	else if (AnimInstance->Montage_IsPlaying(StunMontage))
-	{
-		AnimInstance->Montage_Stop(0.25f, StunMontage);
+		if (StunMontage)
+		{
+			if (NewCount > 0)
+			{
+				// 기절 지속시간이 소스마다 달라(거리 비례 스케일 등) 몽타주 길이와 정확히 안 맞을 수 있으므로,
+				// 몽타주 자체를 Loop로 만들어두고 태그가 사라질 때(NewCount==0) 정지시키는 방식으로 맞춘다.
+				AnimInstance->Montage_Play(StunMontage);
+			}
+			else if (AnimInstance->Montage_IsPlaying(StunMontage))
+			{
+				AnimInstance->Montage_Stop(0.25f, StunMontage);
+			}
+		}
 	}
 
 	if (NewCount > 0 && HasAuthority())
 	{
 		CancelActiveAbilitiesOnStun();
+
+		// 머리 위 스턴바 카운트다운 정확도용 — 서버가 "스턴이 끝나는 서버 월드 시각"을 PlayerState에 기록해
+		// 전 클라(적을 보는 프록시 포함)에 복제한다. 서버에선 스턴 GE가 ActiveEffects에 있어 남은시간 조회가
+		// 되므로, 그 남은시간에 현재 서버 월드시각을 더해 저장. (표시/숨김은 State.Stunned 태그가 담당하고
+		// 이 값은 카운트다운 정확도 전용 — 자세한 배경은 AP1PlayerState::GetStunEndServerTime() 주석 참고.)
+		if (AP1PlayerState* P1PS = GetPlayerState<AP1PlayerState>())
+		{
+			if (const UAbilitySystemComponent* ASC = P1PS->GetAbilitySystemComponent())
+			{
+				FGameplayTagContainer StunTags;
+				StunTags.AddTag(TAG_State_Stunned);
+				float MaxRemaining = 0.0f;
+				for (const float R : ASC->GetActiveEffectsTimeRemaining(FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(StunTags)))
+				{
+					MaxRemaining = FMath::Max(MaxRemaining, R);
+				}
+				if (const UWorld* World = GetWorld())
+				{
+					P1PS->SetStunEndServerTime(World->GetTimeSeconds() + MaxRemaining);
+				}
+			}
+		}
 	}
+}
+
+void AP1HeroCharacter::OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason)
+{
+	UE_LOG(LogP1, Warning, TEXT("[GAS][ActivationFailed] %s | FailureReason=%s | %s"),
+		Ability ? *Ability->GetName() : TEXT("null"), *FailureReason.ToString(), *GetName());
 }
 
 void AP1HeroCharacter::CancelActiveAbilitiesOnStun()
@@ -418,6 +465,7 @@ void AP1HeroCharacter::CancelActiveAbilitiesOnStun()
 
 	for (const FGameplayAbilitySpecHandle& Handle : HandlesToCancel)
 	{
+		UE_LOG(LogP1, Log, TEXT("[CC] CancelActiveAbilitiesOnStun — 취소: %s"), *Handle.ToString());
 		ASC->CancelAbilityHandle(Handle);
 	}
 }

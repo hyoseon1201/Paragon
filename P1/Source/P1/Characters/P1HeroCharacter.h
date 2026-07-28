@@ -65,6 +65,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Progression")
 	TSubclassOf<UGameplayEffect> ManaRestoreEffectClass;
 
+	// Duration=Infinite, Period=1초, Health/Mana Modifier가 Attribute Based로 Target의 HealthRegen/
+	// ManaRegen을 그대로 읽어 매초 더해준다 — HealthRegen/ManaRegen 자체가 이미 버프/레벨에 따라
+	// 바뀌는 값이라 GE 쪽에 고정 수치를 넣지 않고 항상 "현재" 값을 읽게(Snapshot=false) 구성해야 한다.
+	// HandleAbilitySystemReady()에서 스폰/리스폰마다 자신에게 적용하는데, 리스폰마다 PossessedBy가
+	// 다시 불려 이 함수도 재실행되므로 GE 쪽에 Stacking Type=AggregateByTarget/Stack Limit=1을 반드시
+	// 설정해야 한다 — 안 그러면 리스폰할 때마다 회복 틱이 중첩돼 회복량이 배로 늘어난다.
+	UPROPERTY(EditDefaultsOnly, Category = "Progression")
+	TSubclassOf<UGameplayEffect> PassiveRegenEffectClass;
+
 	// Gold Modifier=Custom Calculation Class(UP1MMC_GoldKillBounty) — Data.KillStreak/Data.TimeSinceLastDeath를
 	// SetByCaller로 읽어 현상금을 계산한다. 챔피언 킬 전용(어시스트는 아래 Flat 버전 사용).
 	UPROPERTY(EditDefaultsOnly, Category = "Progression")
@@ -165,6 +174,10 @@ protected:
 	// 액티브 어빌리티만 대상으로 하므로, 이 태그를 명시적으로 뺀 상시 패시브(StoicismDeflect/Vitality)는
 	// 자동으로 영향을 받지 않는다. 서버 권위 전용 — OnStunTagChanged(NewCount>0)에서만 호출.
 	void CancelActiveAbilitiesOnStun();
+
+	// 진단용 — ASC->AbilityFailedCallbacks 구독. 클라이언트가 예측 활성화한 LocalPredicted 어빌리티가
+	// 서버의 authoritative 재검증에서 거부됐을 때 호출된다("홀드 중 어빌리티가 갑자기 끝남" 진단 포인트).
+	void OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason);
 
 	// AttributeSet이 "데미지를 받았지만 생존"을 감지해 보낸 이벤트 수신 — 서버에서만 HitReactEffectClass를
 	// 자신에게 적용한다(OnDiedEventReceived와 동일한 패턴).

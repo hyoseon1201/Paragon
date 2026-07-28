@@ -37,6 +37,4 @@ private:
 	// 디자인 시점(BP/생성자에서 설정한) 원본 DrawSize — 첫 틱에 지연 캡처해 스케일 계산의 기준으로 쓴다.
 	FVector2D BaseDrawSize = FVector2D::ZeroVector;
 	bool bBaseDrawSizeCaptured = false;
-
-	float DebugLogAccum = 0.f;
 };

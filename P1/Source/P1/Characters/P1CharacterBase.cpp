@@ -8,6 +8,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "DrawDebugHelpers.h"
 #include "P1.h"
 
 AP1CharacterBase::AP1CharacterBase()
@@ -23,9 +24,9 @@ AP1CharacterBase::AP1CharacterBase()
 	CharacterType = TAG_Character_Type_Hero;
 }
 
-bool AP1CharacterBase::IsHeroOrBoss() const
+bool AP1CharacterBase::IsHero() const
 {
-	return CharacterType == TAG_Character_Type_Hero || CharacterType == TAG_Character_Type_Boss;
+	return CharacterType == TAG_Character_Type_Hero;
 }
 
 void AP1CharacterBase::MulticastSetMaterialOverride_Implementation(FName SlotName, UMaterialInterface* OverrideMaterial)
@@ -116,6 +117,13 @@ void AP1CharacterBase::MulticastPlayMovingParticleEffect_Implementation(UParticl
 	GetWorldTimerManager().SetTimer(*MoveTimerHandle, MoveDelegate, 0.02f, true);
 }
 
+void AP1CharacterBase::MulticastDrawDebugSphere_Implementation(FVector Location, float Radius, FColor Color, float Duration)
+{
+#if ENABLE_DRAW_DEBUG
+	DrawDebugSphere(GetWorld(), Location, Radius, 24, Color, false, Duration, 0, 2.0f);
+#endif
+}
+
 void AP1CharacterBase::MulticastSetAttachedParticleEffect_Implementation(UParticleSystem* ParticleTemplate, FName SocketName)
 {
 	// 이미 재생 중인 지속 이펙트가 있다면 먼저 정리 — 중첩 재생 방지.
@@ -149,6 +157,31 @@ void AP1CharacterBase::MulticastStopAttachedParticleEffect_Implementation()
 		AttachedParticleEffectComponent->DestroyComponent();
 	}
 	AttachedParticleEffectComponent = nullptr;
+}
+
+void AP1CharacterBase::MulticastSetPersistentParticleEffectAtLocation_Implementation(UParticleSystem* ParticleTemplate, FVector Location, FRotator Rotation, FVector Scale)
+{
+	// 이미 재생 중인 지속 이펙트가 있다면 먼저 정리 — 중첩 재생 방지.
+	MulticastStopPersistentParticleEffectAtLocation_Implementation();
+
+	if (!ParticleTemplate)
+	{
+		return;
+	}
+
+	// bAutoDestroy=false — 이펙트 에셋 자체가 무한 루프여도(Duration=0/Looping) 명시적으로 멈출 때까지 유지.
+	PersistentLocationParticleEffectComponent = UGameplayStatics::SpawnEmitterAtLocation(
+		GetWorld(), ParticleTemplate, Location, Rotation, Scale, false);
+}
+
+void AP1CharacterBase::MulticastStopPersistentParticleEffectAtLocation_Implementation()
+{
+	if (IsValid(PersistentLocationParticleEffectComponent))
+	{
+		PersistentLocationParticleEffectComponent->DeactivateSystem();
+		PersistentLocationParticleEffectComponent->DestroyComponent();
+	}
+	PersistentLocationParticleEffectComponent = nullptr;
 }
 
 bool AP1CharacterBase::IsSameTeam(const AActor* A, const AActor* B)

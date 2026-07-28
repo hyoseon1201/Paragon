@@ -5,7 +5,7 @@
 #include "AbilitySystem/P1GameplayTags.h"
 #include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1AnimNotify_SendGameplayEvent.h"
-#include "AbilitySystem/TargetActors/P1TargetActor_GroundDecal.h"
+#include "AbilitySystem/TargetActors/P1TargetActor_GroundDecal_Deferred.h"
 #include "Characters/P1CharacterBase.h"
 #include "Characters/P1HeroCharacter.h"
 #include "AbilitySystemComponent.h"
@@ -75,9 +75,9 @@ void UP1GameplayAbility_AssaultTheGates::BeginTargeting()
 	const bool bSpawned = Task->BeginSpawningActor(this, TargetActorClass, SpawnedActor);
 	if (bSpawned)
 	{
-		if (AP1TargetActor_GroundDecal* Decal = Cast<AP1TargetActor_GroundDecal>(SpawnedActor))
+		if (AP1TargetActor_GroundDecal_Deferred* DeferredDecal = Cast<AP1TargetActor_GroundDecal_Deferred>(SpawnedActor))
 		{
-			Decal->Configure(MaxRange, AOERadius);
+			DeferredDecal->Configure(MaxRange, AOERadius);
 		}
 		Task->FinishSpawningActor(this, SpawnedActor);
 	}
@@ -109,7 +109,7 @@ void UP1GameplayAbility_AssaultTheGates::OnTargetDataReady(const FGameplayAbilit
 	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates][Cost] Mana %.2f → %.2f (소모량=%.2f)"),
 		ManaBeforeCost, ManaAfterCost, ManaBeforeCost - ManaAfterCost);
 
-	// 쿨다운은 서버 권위로 적용(복제). 기본 지속시간으로 시작하고, 영웅/보스 적중 시 감소.
+	// 쿨다운은 서버 권위로 적용(복제). 기본 지속시간으로 시작하고, 영웅 적중 시 감소.
 	if (CurrentActorInfo->IsNetAuthority())
 	{
 		ApplyCooldownWithDuration(BaseCooldown.GetValueAtLevel(GetAbilityLevel()));
@@ -295,7 +295,7 @@ void UP1GameplayAbility_AssaultTheGates::PerformLandDamage(const FVector& Center
 	GetWorld()->OverlapMultiByChannel(Overlaps, Center, FQuat::Identity, ECC_Pawn,
 		FCollisionShape::MakeSphere(AOERadius), Params);
 
-	bool bHitHeroOrBoss = false;
+	bool bHitHero = false;
 	for (const FOverlapResult& Result : Overlaps)
 	{
 		AP1CharacterBase* Hit = Cast<AP1CharacterBase>(Result.GetActor());
@@ -315,9 +315,9 @@ void UP1GameplayAbility_AssaultTheGates::PerformLandDamage(const FVector& Center
 		// 범위 내 모든 적에게 전체 데미지 (클리브 없음).
 		ApplyDamageToTarget(Hit, 1.0f);
 
-		if (Hit->IsHeroOrBoss())
+		if (Hit->IsHero())
 		{
-			bHitHeroOrBoss = true;
+			bHitHero = true;
 		}
 	}
 
@@ -328,12 +328,12 @@ void UP1GameplayAbility_AssaultTheGates::PerformLandDamage(const FVector& Center
 	}
 #endif
 
-	if (!bHitHeroOrBoss)
+	if (!bHitHero)
 	{
 		return;
 	}
 
-	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates] 영웅/보스 적중 — 이속버프 + 쿨다운 %d%% 감소"), FMath::RoundToInt(CooldownReductionOnHeroHit * 100.0f));
+	UE_LOG(LogP1, Log, TEXT("[AssaultTheGates] 영웅 적중 — 이속버프 + 쿨다운 %d%% 감소"), FMath::RoundToInt(CooldownReductionOnHeroHit * 100.0f));
 
 	// 이동속도 버프 (자신).
 	if (MoveSpeedBuffEffectClass)

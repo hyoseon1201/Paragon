@@ -4,12 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/P1DamageGameplayAbility.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "ScalableFloat.h"
 #include "P1GameplayAbility_PhotonDisruptor.generated.h"
 
 class UAnimMontage;
 class UGameplayEffect;
 class UParticleSystem;
+class AGameplayAbilityTargetActor;
 
 // Q — Photon Disruptor (Dekker).
 // "드론이 하늘 위로 날아가 빔을 유지한 채 사거리 끝 지점까지 이동하며, 이동한 지표면에 짧은 간격으로
@@ -36,6 +38,14 @@ protected:
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	// 조준 확정 — 타겟 데이터(스윕 먼 쪽 끝점) 수신.
+	UFUNCTION()
+	void OnTargetDataReady(const FGameplayAbilityTargetDataHandle& Data);
+
+	// 조준 취소 — 무소모 종료.
+	UFUNCTION()
+	void OnTargetCancelled(const FGameplayAbilityTargetDataHandle& Data);
+
 	void OnBlastTick();
 
 	// 캐스팅 연출용 몽타주 — 스윕 지속시간과는 별개로 재생만 하고 끝(어빌리티 종료를 기다리지 않음).
@@ -43,7 +53,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PhotonDisruptor")
 	TObjectPtr<UAnimMontage> CastMontage;
 
-	// 시작 지점(캐릭터 위치)에서 조준 방향으로 이 거리만큼 떨어진 x,y지점까지 스윕한다.
+	// --- 조준 ---
+	// AP1TargetActor_GroundDecal_Rectangle_Deferred(← AGameplayAbilityTargetActor)을 지정 — 캐릭터
+	// 위치에서 조준 방향으로 SweepRange만큼 뻗어나가는 직사각형 인디케이터로 스윕 경로를 미리 보여준다.
+	UPROPERTY(EditDefaultsOnly, Category = "PhotonDisruptor|Targeting")
+	TSubclassOf<AGameplayAbilityTargetActor> TargetActorClass;
+
+	// 시작 지점(캐릭터 위치)에서 조준 방향으로 이 거리만큼 떨어진 x,y지점까지 스윕한다 — 조준 인디케이터의
+	// 길이이기도 하다.
 	UPROPERTY(EditDefaultsOnly, Category = "PhotonDisruptor|Sweep")
 	float SweepRange = 1200.0f;
 
@@ -95,12 +112,27 @@ protected:
 	bool bShowDebug = false;
 
 private:
-	// 발사 방향(수평) — 논타겟 스킬샷 컨벤션과 동일하게 카메라 조준 방향 기준.
-	FVector GetAimDirectionXY() const;
+	void BeginTargeting();
+
+	// 조준 태그 부여/해제 — AssaultTheGates::SetTargetingState()와 동일한 패턴(루즈 태그, 중복 호출 방지 가드).
+	void SetTargetingState(bool bEnable);
+
+	// State.Rooted는 ActivationOwnedTags(어빌리티 전체 수명)가 아니라 이 헬퍼로 수동 관리한다 — 조준
+	// 단계에서는 자유롭게 이동할 수 있어야 하고(AssaultTheGates/ContainmentFence와 동일), 실제로 드론이
+	// 빔을 쏘는 스윕 구간(확정 이후)에만 캐릭터가 제자리에 고정돼야 하기 때문.
+	void SetRootedState(bool bEnable);
 
 	// 지정 XY 지점에서 아래로 트레이스해 실제 지표면 Z를 구한다(AP1TargetActor_GroundDecal과 동일 패턴).
 	// 트레이스가 아무것도 못 맞히면 SourceCharacter 높이를 그대로 사용.
 	FVector SnapToGround(const FVector& XYSource, const AActor* IgnoreActor) const;
+
+	bool bTargetingActive = false;
+	bool bRootedActive = false;
+
+	// CommitAbility()가 실제로 성공해 스윕이 시작됐는지 — false면(조준만 하다 취소) EndAbility의 쿨다운
+	// 세이프티넷을 걸지 않는다. 코스트도 안 나간 순수 취소에 쿨다운만 걸리는 건 다른 지면조준 스킬
+	// (AssaultTheGates/StasisBomb/ContainmentFence)의 "취소 시 완전 무소모" 컨벤션과 어긋난다.
+	bool bCommitted = false;
 
 	FTimerHandle BlastTimerHandle;
 	int32 CurrentTick = 0;

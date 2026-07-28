@@ -186,6 +186,10 @@ private:
 	// 데미지가 실제로 적용될 때(무적/디플렉트로 무효화되지 않은 경우) 소스를 기록해 어시스트 윈도우를 갱신한다.
 	void RecordDamageContribution(const FGameplayEffectModCallbackData& Data);
 
+	// 가해자(Instigator)의 PlayerController에만 데미지 팝업 텍스트를 띄우도록 Client RPC를 보낸다
+	// ("내가 입힌 데미지만 나에게 보인다" — LoL/Dota 컨벤션). 데미지가 실제로 적용된 경우에만 호출.
+	void NotifyDamageDealt(const FGameplayEffectModCallbackData& Data, float DamageAmount);
+
 	// 사망 확정 시 호출 — 킬러 판별, 최근 10초 내 딜 넣은 플레이어 전원에게 어시스트 지급,
 	// Kills/Deaths/Assists/KillStreak 갱신 후 골드+경험치 보상 GE를 킬러/어시스터 각자에게 적용한다.
 	void HandleKillRewards(const FGameplayEffectModCallbackData& Data);

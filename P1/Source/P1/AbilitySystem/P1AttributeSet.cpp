@@ -6,6 +6,7 @@
 #include "GameplayEffectExtension.h"
 #include "AbilitySystemComponent.h"
 #include "Player/P1PlayerState.h"
+#include "Player/P1PlayerController.h"
 #include "Characters/P1HeroCharacter.h"
 #include "P1.h"
 
@@ -151,6 +152,7 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 			UE_LOG(LogP1, Log, TEXT("[AttributeSet] Damage %.2f applied: Health %.2f → %.2f"),
 				LocalDamage, GetHealth(), NewHealth);
 			SetHealth(NewHealth);
+			NotifyDamageDealt(Data, LocalDamage);
 
 			// 어시스트 판정용 — 실제로 관통된 데미지만 "기여"로 기록(무적/디플렉트는 애초에 이 분기 진입 안 함).
 			RecordDamageContribution(Data);
@@ -173,8 +175,13 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 			else if (ASC)
 			{
 				// 데미지를 받았지만 생존 — 피격 리액션 신호를 보낸다. GE 적용 자체는 캐릭터 클래스에 위임.
+				// Instigator를 실어 보내 정글 몬스터 AI가 "누가 나를 때렸는지"를 알 수 있게 한다(어그로 감지) —
+				// 히어로가 가한 데미지는 ApplyDamageToTarget이 SourceASC->MakeEffectContext()로 컨텍스트를
+				// 만들었으므로 여기서 GetInstigator()는 공격자의 AP1PlayerState를 반환한다(Pawn이 아님,
+				// ASC OwnerActor 컨벤션 — AP1CharacterBase.h 주석 참고).
 				FGameplayEventData HitReactEventData;
 				HitReactEventData.EventTag = TAG_Event_Character_HitReact;
+				HitReactEventData.Instigator = Data.EffectSpec.GetEffectContext().GetInstigator();
 				ASC->HandleGameplayEvent(TAG_Event_Character_HitReact, &HitReactEventData);
 			}
 		}
@@ -314,6 +321,34 @@ void UP1AttributeSet::OnRep_Gold(const FGameplayAttributeData& OldValue)
 void UP1AttributeSet::OnRep_Experience(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, Experience, OldValue);
+}
+
+void UP1AttributeSet::NotifyDamageDealt(const FGameplayEffectModCallbackData& Data, float DamageAmount)
+{
+	AP1PlayerState* InstigatorPS = Cast<AP1PlayerState>(Data.EffectSpec.GetEffectContext().GetInstigator());
+	if (!InstigatorPS)
+	{
+		return;
+	}
+
+	// PlayerState의 Owner는 AController::InitPlayerState()가 설정 — 표준 UE 소유권 규약.
+	AP1PlayerController* InstigatorPC = Cast<AP1PlayerController>(InstigatorPS->GetOwner());
+	if (!InstigatorPC)
+	{
+		return;
+	}
+
+	// GetOwningActor()는 이 ASC의 소유자인 AP1PlayerState를 반환한다(Pawn이 아님 — HandleKillRewards의
+	// VictimPS->GetPawn() 패턴과 동일한 이유). PlayerState는 실제 위치를 추적하지 않아(스폰 시점의
+	// 임의/원점 근처 위치에 고정) 그대로 쓰면 데미지 숫자가 캐릭터와 무관한 엉뚱한 곳에서 스폰된다.
+	const AP1PlayerState* TargetPS = Cast<AP1PlayerState>(GetOwningActor());
+	const APawn* TargetPawn = TargetPS ? TargetPS->GetPawn() : nullptr;
+
+	// ApplyDamageToTarget()이 실어 보낸 색상 구분 태그 — UP1DamageGameplayAbility::ApplyDamageToTarget() 참고.
+	const FGameplayTagContainer* SourceTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
+	const bool bIsMagicalDamage = SourceTags && SourceTags->HasTag(TAG_Data_DamageType_Magical);
+
+	InstigatorPC->ClientShowDamageNumber(TargetPawn ? TargetPawn->GetActorLocation() : FVector::ZeroVector, DamageAmount, bIsMagicalDamage);
 }
 
 void UP1AttributeSet::RecordDamageContribution(const FGameplayEffectModCallbackData& Data)

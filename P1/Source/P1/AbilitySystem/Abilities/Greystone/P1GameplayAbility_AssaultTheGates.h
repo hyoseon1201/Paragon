@@ -17,7 +17,7 @@ struct FGameplayEventData;
 // RMB — Assault The Gates.
 // 2단계 스킬: (1) 지면 조준 상태(장판 표시, 코스트/쿨다운 미소모, LMB=확정 / RMB=취소)
 //            (2) 확정 시 코스트 소모 → 목표 위치로 도약(MotionWarp) → 착지 시 범위 물리피해
-//                → 영웅/보스 적중 시 이동속도 버프 + 쿨다운 35% 감소
+//                → 영웅 적중 시 이동속도 버프 + 쿨다운 35% 감소
 UCLASS()
 class P1_API UP1GameplayAbility_AssaultTheGates : public UP1DamageGameplayAbility
 {
@@ -104,12 +104,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Cooldown")
 	FScalableFloat BaseCooldown = FScalableFloat(12.0f);
 
-	// 영웅/보스 적중 시 쿨다운 감소율 (0~1).
+	// 영웅 적중 시 쿨다운 감소율 (0~1).
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Cooldown", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float CooldownReductionOnHeroHit = 0.35f;
 
 	// --- 보상 ---
-	// 영웅/보스 적중 시 자신에게 적용할 이동속도 버프 GE (+25%, 2.5초 등).
+	// 영웅 적중 시 자신에게 적용할 이동속도 버프 GE (+25%, 2.5초 등).
 	UPROPERTY(EditDefaultsOnly, Category = "Assault|Reward")
 	TSubclassOf<UGameplayEffect> MoveSpeedBuffEffectClass;
 

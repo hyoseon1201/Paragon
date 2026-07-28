@@ -20,8 +20,6 @@ void UP1FloatingWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickT
 		// 배율만 곱해서 SetDrawSize한다(누적 곱 방지, 매번 원본 기준으로 다시 계산).
 		BaseDrawSize = GetDrawSize();
 		bBaseDrawSizeCaptured = true;
-		UE_LOG(LogP1, Log, TEXT("[FloatingWidget] BaseDrawSize 캡처=%s (Owner=%s)"),
-			*BaseDrawSize.ToString(), GetOwner() ? *GetOwner()->GetName() : TEXT("null"));
 	}
 
 	const APlayerController* LocalPC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
@@ -39,14 +37,4 @@ void UP1FloatingWidgetComponent::TickComponent(float DeltaTime, ELevelTick TickT
 	const FVector2D NewDrawSize = BaseDrawSize * Scale;
 
 	SetDrawSize(NewDrawSize);
-
-	DebugLogAccum += DeltaTime;
-	if (DebugLogAccum >= 1.0f)
-	{
-		DebugLogAccum = 0.f;
-		UE_LOG(LogP1, Log, TEXT("[FloatingWidget] Owner=%s LocalPC=%s(Local=%d) Distance=%.0f Ref=%.0f Scale=%.2f BaseDrawSize=%s → DrawSize=%s"),
-			GetOwner() ? *GetOwner()->GetName() : TEXT("null"),
-			*LocalPC->GetName(), LocalPC->IsLocalController() ? 1 : 0,
-			Distance, ReferenceDistance, Scale, *BaseDrawSize.ToString(), *NewDrawSize.ToString());
-	}
 }
