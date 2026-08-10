@@ -26,6 +26,12 @@ protected:
 	// 여기서 수행.
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
+	// AP1GameMode가 AGameModeBase(정식 매치 상태머신 AGameMode가 아님)를 상속하므로 HandleMatchHasStarted()가
+	// 없다 — 대신 BeginPlay()에서 GameState의 매치 시작 시각을 한 번만 고정한다(단일 아레나 구조라
+	// "레벨 시작 시점=매치 시작 시점" 전제가 이미 다른 곳에서도 쓰이고 있음, 정글 몬스터 레벨링 등
+	// 매치 경과 시간을 쓰는 모든 시스템의 공통 기준점).
+	virtual void BeginPlay() override;
+
 	// 팀 수 — 레벨에 배치하는 PlayerStart의 PlayerStartTag("Team0".."Team{NumTeams-1}")도 이 값과
 	// 일치해야 한다(팀당 인원이 여러 명이면 같은 태그의 PlayerStart를 그만큼 여러 개 배치할 것).
 	UPROPERTY(EditDefaultsOnly, Category = "Teams")

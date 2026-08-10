@@ -82,6 +82,7 @@ void AP1PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AP1PlayerState, MyTeamId);
+	DOREPLIFETIME(AP1PlayerState, HeroDisplayName);
 	DOREPLIFETIME(AP1PlayerState, CharacterLevel);
 	DOREPLIFETIME(AP1PlayerState, SkillPoints);
 	DOREPLIFETIME(AP1PlayerState, Kills);
@@ -112,6 +113,30 @@ void AP1PlayerState::ApplyGoldDelta(float Delta)
 	}
 }
 
+void AP1PlayerState::StartPassiveGoldIncome()
+{
+	if (!HasAuthority() || bPassiveGoldIncomeStarted || !PassiveGoldEffectClass)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
+	if (!IsValid(ASC))
+	{
+		return;
+	}
+
+	FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+	EffectContext.AddSourceObject(this);
+	ASC->ApplyGameplayEffectToSelf(PassiveGoldEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext);
+
+	// 이후 리스폰마다 HandleAbilitySystemReady()가 다시 불러도 여기서 조용히 막힌다 — Infinite+Periodic
+	// GE는 이미 ASC(PlayerState 소유, 폰 생사와 무관하게 생존)에 붙어 계속 틱 중이므로 재적용하면 안 된다.
+	bPassiveGoldIncomeStarted = true;
+
+	UE_LOG(LogP1, Log, TEXT("[Shop] 패시브 골드 수입 시작 — %s"), *GetName());
+}
+
 bool AP1PlayerState::ServerBuyItem_Validate(FName ItemRowName)
 {
 	return !ItemRowName.IsNone();
@@ -126,7 +151,10 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 	}
 
 	// LoL 아레나 스타일 — 컴포넌트 합성 없이 완성 아이템만 직접 구매하므로, 같은 아이템을 두 개
-	// 들고 있는 상태 자체가 존재하지 않는다(중복 구매 금지).
+	// 들고 있는 상태 자체가 존재하지 않는다(중복 구매 금지). 깡스탯뿐 아니라 나중에 아이템별 특수
+	// 효과(패시브 등)가 생겼을 때 그게 중복 적용되는 걸 막는 가장 간단한 방법이기도 하다 — 중복
+	// 구매를 허용하면 "깡스탯은 스택되지만 특수효과는 한 번만 적용" 같은 걸 GE를 둘로 쪼개서
+	// 스택 리밋을 다르게 주고, 판매 시 제거 조건도 따로 관리해야 해서 더 복잡해진다.
 	if (Inventory.Contains(ItemRowName))
 	{
 		UE_LOG(LogP1, Warning, TEXT("[Shop] ServerBuyItem: 이미 보유 중인 아이템 — %s"), *ItemRowName.ToString());
@@ -159,16 +187,32 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 	Inventory.Add(ItemRowName);
 	OnInventoryChangedNative.Broadcast();
 
-	// 깡스탯 GE 적용 — Infinite Duration이라 핸들을 들고 있다가 판매 시 그 핸들로만 정확히 제거한다.
-	if (ItemData->StatEffectClass)
+	// 깡스탯 GE + 고유 능력 GE들을 전부 적용 — 다들 Infinite Duration이라 핸들을 들고 있다가 판매 시
+	// 그 핸들들로만 정확히 제거한다.
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{
-		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+		TArray<FActiveGameplayEffectHandle> AppliedHandles;
+
+		FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
+		EffectContext.AddSourceObject(this);
+
+		if (ItemData->StatEffectClass)
 		{
-			FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
-			EffectContext.AddSourceObject(this);
-			const FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectToSelf(
-				ItemData->StatEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext);
-			ActiveItemStatEffects.Add(ItemRowName, Handle);
+			AppliedHandles.Add(ASC->ApplyGameplayEffectToSelf(
+				ItemData->StatEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext));
+		}
+		for (const FP1ItemUniqueAbility& Ability : ItemData->UniqueAbilities)
+		{
+			if (Ability.EffectClass)
+			{
+				AppliedHandles.Add(ASC->ApplyGameplayEffectToSelf(
+					Ability.EffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext));
+			}
+		}
+
+		if (AppliedHandles.Num() > 0)
+		{
+			ActiveItemEffects.Add(ItemRowName, MoveTemp(AppliedHandles));
 		}
 	}
 
@@ -195,15 +239,18 @@ void AP1PlayerState::ServerSellItem_Implementation(FName ItemRowName)
 		return;
 	}
 
-	// 구매 시 걸어둔 깡스탯 GE를 정확히 그 핸들로만 제거 — 같은 아이템 중복 보유가 금지돼 있어
-	// FName 하나당 핸들 하나로 항상 안전하게 매칭된다.
-	if (FActiveGameplayEffectHandle* Handle = ActiveItemStatEffects.Find(ItemRowName))
+	// 구매 시 걸어둔 깡스탯+고유 능력 GE들을 정확히 그 핸들들로만 제거 — 같은 아이템 중복 보유가
+	// 금지돼 있어 FName 하나당 핸들 목록 하나로 항상 안전하게 매칭된다.
+	if (TArray<FActiveGameplayEffectHandle>* Handles = ActiveItemEffects.Find(ItemRowName))
 	{
 		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 		{
-			ASC->RemoveActiveGameplayEffect(*Handle);
+			for (const FActiveGameplayEffectHandle& Handle : *Handles)
+			{
+				ASC->RemoveActiveGameplayEffect(Handle);
+			}
 		}
-		ActiveItemStatEffects.Remove(ItemRowName);
+		ActiveItemEffects.Remove(ItemRowName);
 	}
 
 	static const FString ContextString(TEXT("ServerSellItem"));

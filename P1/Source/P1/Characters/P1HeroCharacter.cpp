@@ -20,7 +20,7 @@
 #include "Characters/P1BuffCosmeticEffectComponent.h"
 #include "MotionWarpingComponent.h"
 #include "UI/P1FloatingWidgetComponent.h"
-#include "UI/Widget/P1FloatingStatusWidget.h"
+#include "UI/Widget/HUD/P1FloatingStatusWidget.h"
 #include "UI/HUD/P1HUD.h"
 #include "UI/WidgetController/P1FloatingStatusWidgetController.h"
 #include "P1.h"
@@ -114,6 +114,16 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 	{
 		ApplyBaseStatsForLevel(P1PS->GetCharacterLevel(), /*bFullHeal=*/true);
 
+		// 스폰마다(리스폰 포함) 불리지만 실제 적용은 매치당 1회뿐 — 사망 중에도 골드가 계속 올라야
+		// 하므로 PassiveRegenEffectClass와 달리 리스폰마다 재적용하지 않는다(AP1PlayerState::
+		// StartPassiveGoldIncome() 주석 참고).
+		P1PS->StartPassiveGoldIncome();
+
+		// 스코어보드가 PlayerState->GetPawn()이 아니라 이 복제 프로퍼티로 캐릭터 이름을 읽는다
+		// (PlayerState->GetPawn()은 다른 클라이언트에는 복제 안 되는 로컬 전용 값이라서 — 자세한
+		// 배경은 AP1PlayerState::GetHeroDisplayName() 주석 참고). 리스폰마다 다시 불려도 같은 값이라 무해.
+		P1PS->SetHeroDisplayName(HeroDisplayName);
+
 		if (PassiveRegenEffectClass)
 		{
 			FGameplayEffectContextHandle RegenContext = ASC->MakeEffectContext();
@@ -171,6 +181,7 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 		if (AP1HUD* P1HUD = PC->GetHUD<AP1HUD>())
 		{
 			P1HUD->InitOverlay(PC, P1PS, ASC, P1PS->GetAttributeSet());
+			P1HUD->InitShop(PC, P1PS, ASC, P1PS->GetAttributeSet());
 		}
 		else
 		{

@@ -8,6 +8,7 @@
 
 class UAbilitySystemComponent;
 class UAttributeSet;
+class AP1PlayerState;
 
 // WidgetController 전체에서 공용으로 쓰는 단일값 델리게이트.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAttributeChangedSignature, float, NewValue);
@@ -46,6 +47,11 @@ class P1_API UP1WidgetController : public UObject
 public:
 	UFUNCTION(BlueprintCallable, Category = "WidgetController")
 	void SetWidgetControllerParams(const FWidgetControllerParams& WCParams);
+
+	// 타입 캐스팅된 PlayerState 접근자 — 모든 서브클래스(Overlay/Shop/Scoreboard 등)가 공용으로 쓴다.
+	// 자식 위젯이 PlayerState의 게터/네이티브 델리게이트(GetInventory, OnInventoryChangedNative 등)에
+	// 직접 접근하고 싶을 때 굳이 컨트롤러마다 같은 Cast를 중복 구현하지 않도록 여기 하나로 모아둔다.
+	AP1PlayerState* GetP1PlayerState() const;
 
 	virtual void BroadcastInitialValues() {}
 	virtual void BindCallbacksToDependencies() {}

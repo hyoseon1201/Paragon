@@ -103,6 +103,16 @@ public:
 	FGameplayAttributeData AbilityHaste;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, AbilityHaste)
 
+	// 0.0~1.0 비율(0%~100%) — AttackSpeed 등과 달리 1.0을 넘을 일이 없어 [0,1]로 클램프한다.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_CriticalChance, Category = "Attributes|Combat")
+	FGameplayAttributeData CriticalChance;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, CriticalChance)
+
+	// 치명타 적중 시 데미지 배율(1.5 = 150%). 일반 공격보다 약해질 수 없으므로 1.0 미만으로 안 내려간다.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_CriticalDamage, Category = "Attributes|Combat")
+	FGameplayAttributeData CriticalDamage;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, CriticalDamage)
+
 	// --- Movement ---
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MovementSpeed, Category = "Attributes|Movement")
@@ -169,6 +179,10 @@ protected:
 	virtual void OnRep_Tenacity(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_AbilityHaste(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_CriticalChance(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_CriticalDamage(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_MovementSpeed(const FGameplayAttributeData& OldValue);
 	UFUNCTION()

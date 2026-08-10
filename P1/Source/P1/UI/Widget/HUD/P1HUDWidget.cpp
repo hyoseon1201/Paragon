@@ -1,12 +1,38 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1HUDWidget.h"
+#include "UI/Widget/HUD/P1HUDWidget.h"
 #include "UI/WidgetController/P1OverlayWidgetController.h"
-#include "UI/Widget/P1SegmentedBarWidget.h"
+#include "UI/Widget/HUD/P1SegmentedBarWidget.h"
+#include "UI/Widget/HUD/P1HUDInventoryWidget.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Components/TextBlock.h"
 #include "Engine/Texture2D.h"
+#include "GameModes/P1GameState.h"
 #include "P1.h"
+
+void UP1HUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	RefreshMatchTime();
+}
+
+void UP1HUDWidget::RefreshMatchTime()
+{
+	if (!MatchTimeText)
+	{
+		return;
+	}
+
+	const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
+	const int32 ElapsedSeconds = P1GS ? FMath::FloorToInt(P1GS->GetElapsedMatchTime()) : 0;
+	if (ElapsedSeconds == LastDisplayedMatchSeconds)
+	{
+		return;
+	}
+
+	LastDisplayedMatchSeconds = ElapsedSeconds;
+	MatchTimeText->SetText(FText::FromString(FString::Printf(TEXT("%02d:%02d"), ElapsedSeconds / 60, ElapsedSeconds % 60)));
+}
 
 void UP1HUDWidget::OnWidgetControllerSet()
 {
@@ -29,6 +55,14 @@ void UP1HUDWidget::OnWidgetControllerSet()
 	Controller->OnKDAChanged.AddDynamic(this, &UP1HUDWidget::OnKDAChanged);
 	Controller->OnExperienceChanged.AddDynamic(this, &UP1HUDWidget::OnExperienceChanged);
 	Controller->OnGoldChanged.AddDynamic(this, &UP1HUDWidget::OnGoldChanged);
+
+	// 우측하단 인벤토리 — 상점과 별도 컨트롤러 없이 같은 UP1OverlayWidgetController를 그대로 전파한다
+	// (UP1HUDInventoryWidget은 PlayerState만 꺼내 쓰고, 인벤토리 변경은 AP1PlayerState::
+	// OnInventoryChangedNative를 직접 구독 — Overlay 컨트롤러에 상점 델리게이트를 추가하지 않기 위함).
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetWidgetController(Controller);
+	}
 
 	UE_LOG(LogP1, Log, TEXT("[HUDWidget][AbilityIcon] OnWidgetControllerSet — OnAbilityIconAssigned 등 3개 델리게이트 구독 완료. SkillIcon 바인딩: LMB=%s RMB=%s Q=%s E=%s R=%s Passive=%s"),
 		SkillIcon_LMB ? TEXT("O") : TEXT("X(미배치)"),

@@ -24,18 +24,20 @@ public class JwtService {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(String username) {
+    // subject는 email — 로그인 식별자가 곧 JWT/매치메이킹 전반의 유일 식별자다(username은 닉네임일 뿐
+    // 유일하지 않으므로 subject로 쓸 수 없음).
+    public String generateToken(String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expirationMs);
         return Jwts.builder()
-                .subject(username)
+                .subject(email)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(signingKey)
                 .compact();
     }
 
-    public String parseUsername(String token) {
+    public String parseEmail(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(signingKey)
                 .build()

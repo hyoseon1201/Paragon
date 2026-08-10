@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1MatchQueueWidget.h"
+#include "UI/Widget/Auth/P1MatchQueueWidget.h"
 #include "Online/P1BackendSubsystem.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"

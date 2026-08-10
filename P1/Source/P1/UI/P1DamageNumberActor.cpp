@@ -2,7 +2,7 @@
 
 #include "UI/P1DamageNumberActor.h"
 #include "UI/P1FloatingWidgetComponent.h"
-#include "UI/Widget/P1DamageNumberWidget.h"
+#include "UI/Widget/HUD/P1DamageNumberWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "P1.h"
 

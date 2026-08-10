@@ -15,6 +15,22 @@ AP1ArenaGameMode::AP1ArenaGameMode()
 	GameStateClass = AP1GameState::StaticClass();
 }
 
+void AP1ArenaGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (AP1GameState* P1GS = GetGameState<AP1GameState>())
+	{
+		P1GS->SetMatchStartTime();
+		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 시작 시각 기록 — ServerWorldTime=%.2f (%s)"),
+			P1GS->GetServerWorldTimeSeconds(), *GetName());
+	}
+	else
+	{
+		UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] BeginPlay — GetGameState<AP1GameState>()가 null, GameStateClass 설정 확인 필요"));
+	}
+}
+
 AActor* AP1ArenaGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	const APlayerController* PC = Cast<APlayerController>(Player);

@@ -57,11 +57,12 @@ TSharedRef<IHttpRequest> UP1BackendSubsystem::CreateRequest(const FString& Endpo
 	return Request;
 }
 
-void UP1BackendSubsystem::Signup(const FString& Username, const FString& Password)
+void UP1BackendSubsystem::Signup(const FString& Email, const FString& Username, const FString& Password)
 {
 	const TSharedRef<IHttpRequest> Request = CreateRequest(TEXT("/api/auth/signup"), TEXT("POST"), false);
 
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+	Body->SetStringField(TEXT("email"), Email);
 	Body->SetStringField(TEXT("username"), Username);
 	Body->SetStringField(TEXT("password"), Password);
 
@@ -74,12 +75,12 @@ void UP1BackendSubsystem::Signup(const FString& Username, const FString& Passwor
 	Request->ProcessRequest();
 }
 
-void UP1BackendSubsystem::Login(const FString& Username, const FString& Password)
+void UP1BackendSubsystem::Login(const FString& Email, const FString& Password)
 {
 	const TSharedRef<IHttpRequest> Request = CreateRequest(TEXT("/api/auth/login"), TEXT("POST"), false);
 
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
-	Body->SetStringField(TEXT("username"), Username);
+	Body->SetStringField(TEXT("email"), Email);
 	Body->SetStringField(TEXT("password"), Password);
 
 	FString BodyString;

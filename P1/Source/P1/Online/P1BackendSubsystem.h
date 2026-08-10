@@ -46,12 +46,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Backend")
 	FOnQueueLeftSignature OnQueueLeft;
 
+	// Email=로그인 식별자(유일), Username=표시용 닉네임(유일할 필요 없음).
 	UFUNCTION(BlueprintCallable, Category = "Backend")
-	void Signup(const FString& Username, const FString& Password);
+	void Signup(const FString& Email, const FString& Username, const FString& Password);
 
+	// 로그인은 Email+Password만 필요 — Username(닉네임)은 로그인 식별자가 아니다.
 	// 성공 시 JWT를 내부에 저장하고 OnLoginComplete를 브로드캐스트한다.
 	UFUNCTION(BlueprintCallable, Category = "Backend")
-	void Login(const FString& Username, const FString& Password);
+	void Login(const FString& Email, const FString& Password);
 
 	// 로그인 후 호출. 큐 참가 응답이 바로 MATCHED면 즉시 OnMatchFound도 브로드캐스트하고,
 	// WAITING이면 내부 타이머로 /api/match/status를 주기적으로 폴링하기 시작한다.

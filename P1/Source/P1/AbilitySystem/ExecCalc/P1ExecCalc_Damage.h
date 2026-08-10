@@ -16,7 +16,8 @@
 //                  + Data.Damage.MagicalPower * Source.MagicalPower
 //                  + Data.Damage.TargetMaxHealthPct * Target.MaxHealth
 //                  + Data.Damage.SourceMaxHealthPct * Source.MaxHealth
-// PreMitigation  = Raw * Data.DamageMultiplier
+// CritRoll       = FRand() < Source.CriticalChance  →  적중 시 CritMultiplier = Source.CriticalDamage, 아니면 1.0
+// PreMitigation  = Raw * Data.DamageMultiplier * CritMultiplier
 // EffectiveArmor = max(0, Target.PhysicalArmor - Source.PhysicalPenetration)
 // Mitigation     = ArmorConstant / (EffectiveArmor + ArmorConstant)   // 데미지가 통과하는 비율
 // FinalDamage    = PreMitigation * Mitigation → Target.Damage(메타)에 누적

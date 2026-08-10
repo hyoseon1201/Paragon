@@ -13,6 +13,8 @@ struct FP1DamageStatics
 	DECLARE_ATTRIBUTE_CAPTUREDEF(PhysicalPenetration);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(PhysicalArmor);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(MaxHealth);
+	DECLARE_ATTRIBUTE_CAPTUREDEF(CriticalChance);
+	DECLARE_ATTRIBUTE_CAPTUREDEF(CriticalDamage);
 
 	// MaxHealth는 Target(위 매크로)과 Source 양쪽에서 캡처해야 하는데, DEFINE_ATTRIBUTE_CAPTUREDEF는
 	// 프로퍼티 이름을 그대로 멤버 이름에 써서(GET_MEMBER_NAME_CHECKED) 같은 이름을 두 번 매크로로
@@ -27,6 +29,8 @@ struct FP1DamageStatics
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, PhysicalPenetration, Source, true);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, PhysicalArmor, Target, false);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, MaxHealth, Target, false);
+		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, CriticalChance, Source, true);
+		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, CriticalDamage, Source, true);
 
 		SourceMaxHealthDef = FGameplayEffectAttributeCaptureDefinition(
 			UP1AttributeSet::GetMaxHealthAttribute(), EGameplayEffectAttributeCaptureSource::Source, true);
@@ -47,6 +51,8 @@ UP1ExecCalc_Damage::UP1ExecCalc_Damage()
 	RelevantAttributesToCapture.Add(DamageStatics().PhysicalArmorDef);
 	RelevantAttributesToCapture.Add(DamageStatics().MaxHealthDef);
 	RelevantAttributesToCapture.Add(DamageStatics().SourceMaxHealthDef);
+	RelevantAttributesToCapture.Add(DamageStatics().CriticalChanceDef);
+	RelevantAttributesToCapture.Add(DamageStatics().CriticalDamageDef);
 }
 
 void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams,
@@ -77,6 +83,12 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 	float SourceMaxHealth = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().SourceMaxHealthDef, EvalParams, SourceMaxHealth);
 
+	float CriticalChance = 0.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().CriticalChanceDef, EvalParams, CriticalChance);
+
+	float CriticalDamage = 1.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().CriticalDamageDef, EvalParams, CriticalDamage);
+
 	// 데미지 계수 채널. 어빌리티가 채우지 않은 채널은 0(=기여 없음).
 	// 배율만 미지정 시 1.0 (감쇠 없음).
 	const float FlatDamage = Spec.GetSetByCallerMagnitude(TAG_Data_Damage_Flat, false, 0.0f);
@@ -91,7 +103,13 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 		+ MagicalPowerCoeff * MagicalPower
 		+ TargetMaxHealthPctCoeff * TargetMaxHealth
 		+ SourceMaxHealthPctCoeff * SourceMaxHealth;
-	const float PreMitigation = Raw * Multiplier;
+
+	// 크리티컬 판정 — ExecCalc는 서버(권한 보유 측)에서만 실행되므로 여기서 한 번만 굴려도 안전하다
+	// (클라이언트/서버가 각자 굴려서 어긋날 여지가 없음).
+	const bool bIsCriticalHit = FMath::FRand() < CriticalChance;
+	const float CriticalMultiplier = bIsCriticalHit ? CriticalDamage : 1.0f;
+
+	const float PreMitigation = Raw * Multiplier * CriticalMultiplier;
 
 	// 관통은 방어력을 flat 차감. 이후 방어 감산 공식 적용.
 	const float EffectiveArmor = FMath::Max(0.0f, Armor - Penetration);
@@ -100,9 +118,10 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 
 	const float FinalDamage = FMath::Max(0.0f, PreMitigation * PassThrough);
 
-	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f → Final=%.1f"),
+	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Crit=%d(%.0f%% 확률, %.2fx) | Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f → Final=%.1f"),
 		FlatDamage, PhysicalPowerCoeff, Power, MagicalPowerCoeff, MagicalPower, TargetMaxHealthPctCoeff, TargetMaxHealth,
-		SourceMaxHealthPctCoeff, SourceMaxHealth, Multiplier, Raw, Armor, Penetration, EffectiveArmor, PassThrough, FinalDamage);
+		SourceMaxHealthPctCoeff, SourceMaxHealth, Multiplier, Raw, bIsCriticalHit, CriticalChance * 100.0f, CriticalMultiplier,
+		Armor, Penetration, EffectiveArmor, PassThrough, FinalDamage);
 
 	OutExecutionOutput.AddOutputModifier(
 		FGameplayModifierEvaluatedData(UP1AttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, FinalDamage));

@@ -11,6 +11,7 @@ class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
 class AP1DamageNumberActor;
+class UP1ScoreboardWidget;
 
 UCLASS()
 class P1_API AP1PlayerController : public APlayerController
@@ -42,10 +43,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
 
+	// Tab을 누르고 있는 동안만 점수판을 띄운다(홀드, 토글 아님) — JumpAction과 동일하게 Started/Completed
+	// 페어로 바인딩.
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> ScoreboardAction;
+
+	// 상점은 마우스로 클릭해야 하니 홀드가 아니라 토글(Started만 바인딩, 누를 때마다 열림↔닫힘 전환).
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> ShopAction;
+
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void HandleJumpStarted(const FInputActionValue& Value);
 	void HandleJumpCompleted(const FInputActionValue& Value);
+	void HandleScoreboardShow(const FInputActionValue& Value);
+	void HandleScoreboardHide(const FInputActionValue& Value);
+	void HandleToggleShop(const FInputActionValue& Value);
 	void HandleAbilityInputPressed(FGameplayTag InputTag);
 	void HandleAbilityInputReleased(FGameplayTag InputTag);
 
@@ -61,7 +74,23 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowDamageNumber(FVector WorldLocation, float DamageAmount, bool bIsMagicalDamage);
 
+	// 상점을 닫고 입력모드/마우스 커서를 게임 모드로 되돌린다 — ShopAction 토글(HandleToggleShop)과
+	// WBP_Shop의 CloseButton(UP1ShopWidget::HandleCloseClicked) 양쪽이 공유하는 진입점. 위젯이 자기
+	// Visibility만 Collapsed로 바꾸고 끝내면(예전 버그) 마우스 커서가 안 사라지고 GameAndUI 입력모드에
+	// 그대로 남는다 — 반드시 이 함수를 통해서 닫을 것.
+	void CloseShop();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<AP1DamageNumberActor> DamageNumberActorClass;
+
+	// WBP_Scoreboard(parent=UP1ScoreboardWidget) 지정.
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UP1ScoreboardWidget> ScoreboardWidgetClass;
+
+private:
+	// 처음 Tab을 누를 때 지연 생성 — 뷰포트에 올라간 채로 Visibility만 토글한다(홀드마다 새로 만들지
+	// 않음). Collapsed 상태로 시작해 첫 표시 전까지 화면을 가리지 않는다.
+	UPROPERTY()
+	TObjectPtr<UP1ScoreboardWidget> ScoreboardWidgetInstance;
 };

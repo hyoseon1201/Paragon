@@ -11,6 +11,11 @@
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"
 #include "UI/P1DamageNumberActor.h"
+#include "UI/Widget/Scoreboard/P1ScoreboardWidget.h"
+#include "UI/WidgetController/P1ScoreboardWidgetController.h"
+#include "UI/Widget/Shop/P1ShopWidget.h"
+#include "UI/HUD/P1HUD.h"
+#include "Blueprint/UserWidget.h"
 #include "P1.h"
 
 AP1PlayerController::AP1PlayerController()
@@ -66,6 +71,16 @@ void AP1PlayerController::SetupInputComponent()
 		{
 			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AP1PlayerController::HandleJumpStarted);
 			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AP1PlayerController::HandleJumpCompleted);
+		}
+		if (ScoreboardAction)
+		{
+			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Started, this, &AP1PlayerController::HandleScoreboardShow);
+			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Completed, this, &AP1PlayerController::HandleScoreboardHide);
+			EnhancedInputComponent->BindAction(ScoreboardAction, ETriggerEvent::Canceled, this, &AP1PlayerController::HandleScoreboardHide);
+		}
+		if (ShopAction)
+		{
+			EnhancedInputComponent->BindAction(ShopAction, ETriggerEvent::Started, this, &AP1PlayerController::HandleToggleShop);
 		}
 
 		for (const auto& [Action, Tag] : AbilityInputActions)
@@ -158,6 +173,84 @@ void AP1PlayerController::HandleJumpCompleted(const FInputActionValue& Value)
 	{
 		ControlledCharacter->StopJumping();
 	}
+}
+
+void AP1PlayerController::HandleScoreboardShow(const FInputActionValue& Value)
+{
+	if (!ScoreboardWidgetClass)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[Scoreboard] ScoreboardWidgetClass 미설정 — BP_P1PlayerController에서 지정하세요."));
+		return;
+	}
+
+	// 처음 누를 때만 생성 — 이후로는 계속 재사용하며 Visibility만 토글한다.
+	if (!ScoreboardWidgetInstance)
+	{
+		ScoreboardWidgetInstance = CreateWidget<UP1ScoreboardWidget>(this, ScoreboardWidgetClass);
+		if (ScoreboardWidgetInstance)
+		{
+			// Scoreboard는 ASC가 필요 없어 AP1HUD 레지스트리를 타지 않지만, 컨트롤러 전파 패턴은
+			// 상점과 통일한다 — 델리게이트 없이 GameState 접근만 제공하는 가벼운 컨트롤러.
+			UP1ScoreboardWidgetController* Controller = NewObject<UP1ScoreboardWidgetController>(this);
+			Controller->SetWidgetControllerParams(FWidgetControllerParams(this, PlayerState, nullptr, nullptr));
+			ScoreboardWidgetInstance->SetWidgetController(Controller);
+
+			ScoreboardWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (ScoreboardWidgetInstance)
+	{
+		// 매번 다시 그린다 — 홀드하는 순간의 최신 KDA/캐릭터 스냅샷을 보여줘야 하므로.
+		ScoreboardWidgetInstance->RefreshScoreboard();
+		ScoreboardWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+}
+
+void AP1PlayerController::HandleScoreboardHide(const FInputActionValue& Value)
+{
+	if (ScoreboardWidgetInstance)
+	{
+		ScoreboardWidgetInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void AP1PlayerController::HandleToggleShop(const FInputActionValue& Value)
+{
+	// 상점 위젯은 스코어보드처럼 여기서 만들지 않는다 — AP1HUD::InitShop()이 HandleAbilitySystemReady
+	// 시점에 이미 만들어 Collapsed 상태로 뷰포트에 올려뒀다(ASC/Gold/Inventory 델리게이트를 구독하는
+	// 위젯 컨트롤러가 필요해서 Overlay와 같은 경로를 탄다 — 자세한 배경은 AP1HUD::InitShop() 참고).
+	AP1HUD* P1HUD = GetHUD<AP1HUD>();
+	UP1ShopWidget* ShopWidget = P1HUD ? P1HUD->GetShopWidget() : nullptr;
+	if (!ShopWidget)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[Shop] ShopWidget이 아직 없습니다 — AP1HUD::InitShop() 호출 여부 확인 필요"));
+		return;
+	}
+
+	const bool bWasOpen = ShopWidget->GetVisibility() != ESlateVisibility::Collapsed;
+	if (bWasOpen)
+	{
+		CloseShop();
+	}
+	else
+	{
+		ShopWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		// GameAndUI — WASD 이동은 그대로 살리고 마우스만 커서로 풀어서 Buy/Sell 버튼을 클릭할 수 있게.
+		SetInputMode(FInputModeGameAndUI());
+		bShowMouseCursor = true;
+	}
+}
+
+void AP1PlayerController::CloseShop()
+{
+	AP1HUD* P1HUD = GetHUD<AP1HUD>();
+	if (UP1ShopWidget* ShopWidget = P1HUD ? P1HUD->GetShopWidget() : nullptr)
+	{
+		ShopWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
 }
 
 void AP1PlayerController::HandleAbilityInputPressed(FGameplayTag InputTag)

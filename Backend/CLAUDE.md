@@ -48,12 +48,12 @@ com.p1.backend
 |---|---|---|
 | 프로젝트 스캐폴드 (`pom.xml`, Maven Wrapper) | 완료 | Spring Boot 3.3.4, Java 21 |
 | `docker-compose.yml` (MySQL) | 완료 | `mysql:8.4`, DB=`p1`, 계정 `p1`/`p1password` |
-| `entity/User` + `repository/UserRepository` | 완료 | username unique, passwordHash(BCrypt) |
-| `service/JwtService` | 완료 | jjwt 0.12.x, HS256, `jwt.secret`/`jwt.expiration-ms`(application.yml) |
-| `service/AuthService` (signup/login) | 완료 | jBCrypt 해싱/검증 |
-| `controller/AuthController` | 완료 | `POST /api/auth/signup`(201/409), `POST /api/auth/login`(200/401) |
-| `interceptor/JwtAuthInterceptor` + `config/WebConfig` | 완료 | `/api/match/**`만 보호, `Authorization: Bearer <token>` 검증 |
-| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(현재 2) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정. `joinQueue()`/`leaveQueue()` 둘 다 `synchronized`(같은 인스턴스 락 공유)라 동시 요청도 순차적으로 처리됨 — curl로 검증(대기 중이던 1명에 2명이 거의 동시에 합류해도 먼저 락을 잡은 쪽이 매칭되고 나머지는 대기). `leaveQueue()`는 이미 매칭된 유저에겐 취소를 거부하고 그대로 MATCHED를 반환(레이스 컨디션 방지) — 이것도 curl로 검증됨 |
+| `entity/User` + `repository/UserRepository` | 완료 | **로그인 식별자는 email(unique), username은 표시용 닉네임으로 분리(2026-07-30 변경)** — 처음엔 username을 로그인 아이디로 썼으나, 스코어보드에 뜨는 표시 이름과 로그인 아이디가 같은 값이면 "표시 이름은 중복 가능해야 하는데 로그인 아이디는 유일해야 한다"는 요구가 충돌해서 분리함. `User(email, username, passwordHash)` 생성자, `findByEmail`/`existsByEmail`(username 쪽 조회 메서드는 더 이상 없음 — 로그인/중복 체크 어디에도 username을 키로 안 씀). passwordHash(BCrypt) |
+| `service/JwtService` | 완료 | jjwt 0.12.x, HS256, `jwt.secret`/`jwt.expiration-ms`(application.yml). **토큰 subject=email**(`generateToken(email)`/`parseEmail(token)`) — username은 유일하지 않아 subject로 쓸 수 없음 |
+| `service/AuthService` (signup/login) | 완료 | jBCrypt 해싱/검증. `signup(email, username, rawPassword)`은 `existsByEmail`로 중복 체크(`EmailTakenException`), `login(email, rawPassword)`은 `findByEmail`로 조회 |
+| `controller/AuthController` | 완료 | `POST /api/auth/signup`(body: `{email, username, password}`, 201/409 `EMAIL_TAKEN`), `POST /api/auth/login`(body: `{email, password}`, 200/401) |
+| `interceptor/JwtAuthInterceptor` + `config/WebConfig` | 완료 | `/api/match/**`만 보호, `Authorization: Bearer <token>` 검증 → 검증된 email을 `AUTHENTICATED_EMAIL_ATTRIBUTE` request attribute에 저장(예전엔 username이었음) |
+| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(현재 2) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정. 큐/매칭 식별자는 email(예전엔 username이었으나 유일성이 깨져서 email로 교체, 내부 변수명도 `queuedEmails`로 변경). `joinQueue()`/`leaveQueue()` 둘 다 `synchronized`(같은 인스턴스 락 공유)라 동시 요청도 순차적으로 처리됨 — curl로 검증(대기 중이던 1명에 2명이 거의 동시에 합류해도 먼저 락을 잡은 쪽이 매칭되고 나머지는 대기). `leaveQueue()`는 이미 매칭된 유저에겐 취소를 거부하고 그대로 MATCHED를 반환(레이스 컨디션 방지) — 이것도 curl로 검증됨 |
 | `controller/MatchController` | 완료 | `POST /api/match/queue`, `POST /api/match/leave`, `GET /api/match/status` |
 | 컴파일 검증 | 완료 | `./mvnw compile` 성공 |
 | MySQL 기동 후 curl 엔드투엔드 검증 | 완료 | signup×2→login×2→queue×2(WAITING→MATCHED, 대기 중이던 유저도 재조회 시 MATCHED)+에러 경로(409/401/401) 확인. 이후 `leaveQueue` 추가분도 별도 검증: 혼자 참가 후 이탈→NOT_QUEUED, 매칭 성사 후 이탈 시도→취소 거부되고 MATCHED 유지 |

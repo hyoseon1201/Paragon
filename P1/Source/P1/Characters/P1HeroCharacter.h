@@ -44,6 +44,10 @@ public:
 	// 최대치 증가분만큼만 현재 체력/마나를 함께 늘린다(레벨업이 공짜 완전회복이 되면 안 되므로).
 	void CheckLevelUp();
 
+	// 점수판 등 UI가 "이 플레이어가 어떤 영웅을 플레이 중인지" 표시할 때 사용 — 머리 위 위젯과 동일한
+	// 이름을 그대로 노출한다(별도 축약형을 따로 관리하지 않음).
+	FText GetHeroDisplayName() const { return HeroDisplayName; }
+
 protected:
 	// 머리 위 FloatingStatus 위젯에 표시할 영웅 이름(예: "Greystone"). 영웅 BP마다 설정.
 	UPROPERTY(EditDefaultsOnly, Category = "Character")

@@ -21,20 +21,20 @@ public class MatchController {
 
     @PostMapping("/queue")
     public MatchStatusResponse joinQueue(HttpServletRequest request) {
-        return matchmakingService.joinQueue(resolveUsername(request));
+        return matchmakingService.joinQueue(resolveEmail(request));
     }
 
     @PostMapping("/leave")
     public MatchStatusResponse leaveQueue(HttpServletRequest request) {
-        return matchmakingService.leaveQueue(resolveUsername(request));
+        return matchmakingService.leaveQueue(resolveEmail(request));
     }
 
     @GetMapping("/status")
     public MatchStatusResponse status(HttpServletRequest request) {
-        return matchmakingService.getStatus(resolveUsername(request));
+        return matchmakingService.getStatus(resolveEmail(request));
     }
 
-    private String resolveUsername(HttpServletRequest request) {
-        return (String) request.getAttribute(JwtAuthInterceptor.AUTHENTICATED_USERNAME_ATTRIBUTE);
+    private String resolveEmail(HttpServletRequest request) {
+        return (String) request.getAttribute(JwtAuthInterceptor.AUTHENTICATED_EMAIL_ATTRIBUTE);
     }
 }

@@ -12,11 +12,13 @@ class UP1AttributeSet;
 class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
+class AP1JungleCampAnchor;
 struct FGameplayEventData;
 
 // 정글 몬스터(중립 캠프) — ASC/AttributeSet을 PlayerState가 아니라 Pawn 자신이 직접 들고 있다
 // (AP1CharacterBase.h 주석에 이미 예고된 패턴: "AP1MinionCharacter는 Pawn 자신에 있음"과 동일 컨벤션).
-// TeamId는 기본값(255=NoTeam)을 그대로 둬서 별도 설정 없이 모든 영웅에게 적대 판정이 되게 한다.
+// TeamId는 MonsterTeamId(254) 고정 — 몬스터끼리는 아군, 모든 히어로 팀과는 적대(자세한 배경은 위
+// MonsterTeamId 선언부 주석 참고).
 //
 // AI 쪽 FSM(Idle/Chase/Reset)은 AP1JungleMonsterAIController가 돌리는 Behavior Tree가 담당하고,
 // 이 클래스는 그 BT가 참조/호출하는 "능력"만 제공한다 — 홈/리시 반경 데이터, 리시 복귀 시
@@ -29,6 +31,12 @@ class P1_API AP1JungleMonsterCharacter : public AP1CharacterBase
 
 public:
 	AP1JungleMonsterCharacter();
+
+	// 전용 "몬스터" 팀 ID — 255(NoTeam)를 그대로 쓰면 IsSameTeam()의 "둘 중 하나라도 NoTeam이면
+	// 무조건 적대" 규칙 때문에 몬스터끼리도 서로 적대로 판정돼(캠프 몬스터끼리 근접공격이 서로에게
+	// 맞는 버그의 원인) 히어로 팀(0~NumTeams-1)과 절대 겹치지 않는 이 값으로 고정한다 — 몬스터끼리는
+	// 같은 팀(아군, 안 맞음)이면서 모든 히어로 팀과는 계속 적대로 남는다.
+	static constexpr uint8 MonsterTeamId = 254;
 
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -66,6 +74,10 @@ public:
 	// 이후(즉시 스폰 SpawnActor 사용 등)에 호출하면 이미 늦다(투사체 바운스 설정과 동일한 타이밍 함정).
 	void SetMonsterLevel(int32 NewLevel) { MonsterLevel = FMath::Max(1, NewLevel); }
 	int32 GetMonsterLevel() const { return MonsterLevel; }
+
+	// AP1JungleCampAnchor가 스폰 직후 자신을 등록 — 맞았을 때(OnHitReactEventReceived) 같은 캠프의
+	// 나머지 무리에게도 어그로를 전파할 수 있게 역참조를 들고 있는다(단일 몬스터 캠프면 그냥 무시됨).
+	void SetOwningCampAnchor(AP1JungleCampAnchor* Anchor) { OwningCampAnchor = Anchor; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -140,4 +152,8 @@ private:
 	bool bIsLeashRecovering = false;
 
 	FActiveGameplayEffectHandle ResetInvulnerabilityEffectHandle;
+
+	// SetOwningCampAnchor()로 설정 — 레벨에 단독 배치돼 테스트하는 경우(캠프 앵커 없음) null일 수
+	// 있으므로 항상 유효성 체크 후 사용.
+	TWeakObjectPtr<AP1JungleCampAnchor> OwningCampAnchor;
 };

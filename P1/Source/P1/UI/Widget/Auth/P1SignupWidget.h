@@ -23,6 +23,11 @@ class P1_API UP1SignupWidget : public UUserWidget
 protected:
 	virtual void NativeConstruct() override;
 
+	// 로그인 식별자(유일) — 회원가입 때만 받고 이후엔 로그인에만 쓰인다.
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UEditableTextBox> EmailBox;
+
+	// 표시용 닉네임(스코어보드 등) — 로그인 식별자가 아니라 중복 허용.
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UEditableTextBox> UsernameBox;
 

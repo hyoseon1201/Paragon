@@ -16,26 +16,27 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    public static class UsernameTakenException extends RuntimeException {
+    public static class EmailTakenException extends RuntimeException {
     }
 
     public static class InvalidCredentialsException extends RuntimeException {
     }
 
-    public void signup(String username, String rawPassword) {
-        if (userRepository.existsByUsername(username)) {
-            throw new UsernameTakenException();
+    public void signup(String email, String username, String rawPassword) {
+        if (userRepository.existsByEmail(email)) {
+            throw new EmailTakenException();
         }
         String hash = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
-        userRepository.save(new User(username, hash));
+        userRepository.save(new User(email, username, hash));
     }
 
-    public String login(String username, String rawPassword) {
-        User user = userRepository.findByUsername(username)
+    // 토큰 subject는 email — 로그인 식별자가 곧 매치메이킹 큐/JWT 전반의 유일 식별자로 쓰인다.
+    public String login(String email, String rawPassword) {
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(InvalidCredentialsException::new);
         if (!BCrypt.checkpw(rawPassword, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
-        return jwtService.generateToken(username);
+        return jwtService.generateToken(email);
     }
 }

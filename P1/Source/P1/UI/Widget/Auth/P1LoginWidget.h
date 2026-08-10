@@ -23,8 +23,9 @@ class P1_API UP1LoginWidget : public UUserWidget
 protected:
 	virtual void NativeConstruct() override;
 
+	// 로그인 식별자는 Email — Username(닉네임)은 로그인에 안 쓰인다.
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UEditableTextBox> UsernameBox;
+	TObjectPtr<UEditableTextBox> EmailBox;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UEditableTextBox> PasswordBox;

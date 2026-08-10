@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1SkillIconWidget.h"
+#include "UI/Widget/HUD/P1SkillIconWidget.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"

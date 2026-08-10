@@ -1,4 +1,4 @@
 package com.p1.backend.dto;
 
-public record SignupResponse(String username) {
+public record SignupResponse(String email, String username) {
 }

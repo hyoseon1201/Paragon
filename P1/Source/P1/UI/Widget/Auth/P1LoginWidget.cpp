@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1LoginWidget.h"
+#include "UI/Widget/Auth/P1LoginWidget.h"
 #include "Online/P1BackendSubsystem.h"
 #include "Components/EditableTextBox.h"
 #include "Components/Button.h"
@@ -24,9 +24,9 @@ void UP1LoginWidget::HandleLoginClicked()
 {
 	if (UP1BackendSubsystem* Backend = GetBackendSubsystem())
 	{
-		if (UsernameBox && PasswordBox)
+		if (EmailBox && PasswordBox)
 		{
-			Backend->Login(UsernameBox->GetText().ToString(), PasswordBox->GetText().ToString());
+			Backend->Login(EmailBox->GetText().ToString(), PasswordBox->GetText().ToString());
 		}
 	}
 }

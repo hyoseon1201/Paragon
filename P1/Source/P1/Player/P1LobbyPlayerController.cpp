@@ -1,7 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Player/P1LobbyPlayerController.h"
-#include "UI/Widget/P1PreGameHUDWidget.h"
+#include "UI/Widget/Auth/P1PreGameHUDWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "P1.h"
 

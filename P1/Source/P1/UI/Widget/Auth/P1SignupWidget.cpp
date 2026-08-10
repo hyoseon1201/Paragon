@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1SignupWidget.h"
+#include "UI/Widget/Auth/P1SignupWidget.h"
 #include "Online/P1BackendSubsystem.h"
 #include "Components/EditableTextBox.h"
 #include "Components/Button.h"
@@ -24,9 +24,9 @@ void UP1SignupWidget::HandleSignupClicked()
 {
 	if (UP1BackendSubsystem* Backend = GetBackendSubsystem())
 	{
-		if (UsernameBox && PasswordBox)
+		if (EmailBox && UsernameBox && PasswordBox)
 		{
-			Backend->Signup(UsernameBox->GetText().ToString(), PasswordBox->GetText().ToString());
+			Backend->Signup(EmailBox->GetText().ToString(), UsernameBox->GetText().ToString(), PasswordBox->GetText().ToString());
 		}
 	}
 }

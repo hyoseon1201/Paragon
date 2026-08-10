@@ -21,7 +21,11 @@ UP1AttributeSet::UP1AttributeSet()
 
 	InitPhysicalPower(68.0f);
 	InitMagicalPower(0.0f);
-	InitAttackSpeed(1.0f);
+	// 퍼센트 스케일(100=기준/100%) — P1GameplayAbility_MeleeAttack/RangedAttack의 PlayRate 계산이
+	// AttackSpeed/100.0f로 직접 나눠 쓰기 때문에 여기도 그 스케일을 따라야 한다(다른 대부분의 %
+	// 스탯처럼 1.0=100%인 분수 스케일이 아님 — 상점 UI 표시할 때 이 차이를 반드시 반영할 것,
+	// UP1ShopStatsWidget::BindStat()의 bAlreadyPercent 참고).
+	InitAttackSpeed(100.0f);
 	InitBasicAttackTime(1.1f);
 	InitAttackRange(275.0f);
 	InitCleave(0.2f);
@@ -32,6 +36,8 @@ UP1AttributeSet::UP1AttributeSet()
 	InitLifeSteal(0.0f);
 	InitTenacity(0.0f);
 	InitAbilityHaste(0.0f);
+	InitCriticalChance(0.0f);
+	InitCriticalDamage(1.5f);
 
 	InitMovementSpeed(720.0f);
 
@@ -63,6 +69,8 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, LifeSteal, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Tenacity, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AbilityHaste, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalChance, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalDamage, COND_None, REPNOTIFY_Always);
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MovementSpeed, COND_None, REPNOTIFY_Always);
 
@@ -95,6 +103,14 @@ void UP1AttributeSet::ClampAttribute(const FGameplayAttribute& Attribute, float&
 	else if (Attribute == GetGoldAttribute() || Attribute == GetExperienceAttribute())
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetCriticalChanceAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
+	}
+	else if (Attribute == GetCriticalDamageAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 1.0f);
 	}
 }
 
@@ -308,6 +324,16 @@ void UP1AttributeSet::OnRep_AbilityHaste(const FGameplayAttributeData& OldValue)
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, AbilityHaste, OldValue);
 }
 
+void UP1AttributeSet::OnRep_CriticalChance(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, CriticalChance, OldValue);
+}
+
+void UP1AttributeSet::OnRep_CriticalDamage(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, CriticalDamage, OldValue);
+}
+
 void UP1AttributeSet::OnRep_MovementSpeed(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, MovementSpeed, OldValue);
@@ -338,11 +364,22 @@ void UP1AttributeSet::NotifyDamageDealt(const FGameplayEffectModCallbackData& Da
 		return;
 	}
 
-	// GetOwningActor()는 이 ASC의 소유자인 AP1PlayerState를 반환한다(Pawn이 아님 — HandleKillRewards의
-	// VictimPS->GetPawn() 패턴과 동일한 이유). PlayerState는 실제 위치를 추적하지 않아(스폰 시점의
-	// 임의/원점 근처 위치에 고정) 그대로 쓰면 데미지 숫자가 캐릭터와 무관한 엉뚱한 곳에서 스폰된다.
-	const AP1PlayerState* TargetPS = Cast<AP1PlayerState>(GetOwningActor());
-	const APawn* TargetPawn = TargetPS ? TargetPS->GetPawn() : nullptr;
+	// GetOwningActor()는 히어로면 AP1PlayerState를 반환한다(Pawn이 아님 — HandleKillRewards의
+	// VictimPS->GetPawn() 패턴과 동일한 이유. PlayerState는 실제 위치를 추적하지 않아 그대로 쓰면
+	// 데미지 숫자가 캐릭터와 무관한 엉뚱한 곳에서 스폰된다). 반면 정글 몬스터는 ASC/AttributeSet을
+	// PlayerState가 아니라 Pawn 자신이 직접 들고 있어서(AP1JungleMonsterCharacter 설계) GetOwningActor()가
+	// 이미 Pawn 자신이다 — 몬스터를 때렸을 때 이 Cast<AP1PlayerState>가 항상 실패해 TargetPawn이 null이
+	// 되고 데미지 숫자가 월드 원점(0,0,0)에서 스폰되던 버그의 원인이었다. AP1JungleMonsterCharacter::
+	// OnHitReactEventReceived()의 Instigator 이중 해석과 동일한 패턴으로 양쪽 다 대응한다.
+	const APawn* TargetPawn = nullptr;
+	if (const AP1PlayerState* TargetPS = Cast<AP1PlayerState>(GetOwningActor()))
+	{
+		TargetPawn = TargetPS->GetPawn();
+	}
+	else
+	{
+		TargetPawn = Cast<APawn>(GetOwningActor());
+	}
 
 	// ApplyDamageToTarget()이 실어 보낸 색상 구분 태그 — UP1DamageGameplayAbility::ApplyDamageToTarget() 참고.
 	const FGameplayTagContainer* SourceTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();

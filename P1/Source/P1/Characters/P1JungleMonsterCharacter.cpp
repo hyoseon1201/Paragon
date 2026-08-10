@@ -4,10 +4,11 @@
 #include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "AbilitySystemComponent.h"
+#include "AI/P1JungleCampAnchor.h"
 #include "AI/P1JungleMonsterAIController.h"
 #include "Player/P1PlayerState.h"
 #include "UI/P1FloatingWidgetComponent.h"
-#include "UI/Widget/P1FloatingStatusWidget.h"
+#include "UI/Widget/HUD/P1FloatingStatusWidget.h"
 #include "UI/WidgetController/P1FloatingStatusWidgetController.h"
 #include "AIController.h"
 #include "BrainComponent.h"
@@ -45,8 +46,10 @@ AP1JungleMonsterCharacter::AP1JungleMonsterCharacter()
 	CachedAbilitySystemComponent = AbilitySystemComponent;
 
 	CharacterType = TAG_Character_Type_Monster;
-	// TeamId는 베이스 기본값(255=NoTeam) 그대로 — IsSameTeam()이 항상 false를 반환해 모든 영웅에게
-	// 자동으로 적대(공격 가능)가 된다. 별도 설정 불필요.
+	// TeamId=254(전용 몬스터 팀) — 255(NoTeam)를 그대로 쓰면 IsSameTeam()의 "둘 중 하나라도 NoTeam이면
+	// 무조건 적대" 규칙 때문에 몬스터끼리도 서로 적대로 판정돼 같은 캠프 몬스터끼리 근접공격이 서로에게
+	// 맞는 버그가 있었다(자세한 배경은 헤더의 MonsterTeamId 선언부 참고).
+	TeamId = MonsterTeamId;
 }
 
 void AP1JungleMonsterCharacter::BeginPlay()
@@ -221,6 +224,13 @@ void AP1JungleMonsterCharacter::OnHitReactEventReceived(const FGameplayEventData
 		if (AP1JungleMonsterAIController* AICon = Cast<AP1JungleMonsterAIController>(GetController()))
 		{
 			AICon->NotifyAggro(AttackerPawn);
+		}
+
+		// 같은 캠프 무리 전체에게도 같은 타겟으로 어그로를 전파 — 한 마리만 맞아도 무리 전체가 함께
+		// 반응해야 자연스럽다(단독 배치돼 앵커가 없는 몬스터는 OwningCampAnchor가 비어있어 그냥 스킵됨).
+		if (AP1JungleCampAnchor* Anchor = OwningCampAnchor.Get())
+		{
+			Anchor->NotifyCampAggro(AttackerPawn, this);
 		}
 	}
 }

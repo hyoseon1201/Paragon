@@ -1,8 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "UI/HUD/P1HUD.h"
-#include "UI/Widget/P1HUDWidget.h"
+#include "UI/Widget/HUD/P1HUDWidget.h"
+#include "UI/Widget/Shop/P1ShopWidget.h"
 #include "UI/WidgetController/P1OverlayWidgetController.h"
+#include "UI/WidgetController/P1ShopWidgetController.h"
+#include "Components/Widget.h"
 #include "P1.h"
 
 UP1OverlayWidgetController* AP1HUD::GetOverlayWidgetController(const FWidgetControllerParams& WCParams)
@@ -41,4 +44,42 @@ void AP1HUD::InitOverlay(APlayerController* PC, APlayerState* PS, UAbilitySystem
 	Controller->BroadcastInitialValues();
 
 	UE_LOG(LogP1, Log, TEXT("[P1HUD] Overlay 초기화 완료 — PC=%s"), *PC->GetName());
+}
+
+UP1ShopWidgetController* AP1HUD::GetShopWidgetController(const FWidgetControllerParams& WCParams)
+{
+	if (!ShopWidgetController)
+	{
+		checkf(ShopWidgetControllerClass,
+			TEXT("AP1HUD: ShopWidgetControllerClass가 설정되지 않았습니다 — BP_P1HUD의 Details를 확인하세요."));
+
+		ShopWidgetController = NewObject<UP1ShopWidgetController>(this, ShopWidgetControllerClass);
+		ShopWidgetController->SetWidgetControllerParams(WCParams);
+		ShopWidgetController->BindCallbacksToDependencies();
+	}
+	return ShopWidgetController;
+}
+
+void AP1HUD::InitShop(APlayerController* PC, APlayerState* PS, UAbilitySystemComponent* ASC, UAttributeSet* AS)
+{
+	if (ShopWidget)
+	{
+		return;
+	}
+
+	checkf(ShopWidgetClass,
+		TEXT("AP1HUD: ShopWidgetClass가 설정되지 않았습니다 — BP_P1HUD의 Details를 확인하세요."));
+
+	const FWidgetControllerParams WCParams(PC, PS, ASC, AS);
+	UP1ShopWidgetController* Controller = GetShopWidgetController(WCParams);
+
+	ShopWidget = CreateWidget<UP1ShopWidget>(PC, ShopWidgetClass);
+	ShopWidget->SetWidgetController(Controller);
+	ShopWidget->AddToViewport();
+	// 토글 키를 누르기 전까지는 숨김 — Overlay와 달리 상점은 상시 노출 화면이 아니다.
+	ShopWidget->SetVisibility(ESlateVisibility::Collapsed);
+
+	Controller->BroadcastInitialValues();
+
+	UE_LOG(LogP1, Log, TEXT("[P1HUD] Shop 초기화 완료 — PC=%s"), *PC->GetName());
 }

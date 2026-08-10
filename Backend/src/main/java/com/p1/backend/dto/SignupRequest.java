@@ -1,4 +1,4 @@
 package com.p1.backend.dto;
 
-public record SignupRequest(String username, String password) {
+public record SignupRequest(String email, String username, String password) {
 }

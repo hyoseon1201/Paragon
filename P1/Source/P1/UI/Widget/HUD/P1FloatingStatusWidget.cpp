@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1FloatingStatusWidget.h"
+#include "UI/Widget/HUD/P1FloatingStatusWidget.h"
 #include "UI/WidgetController/P1FloatingStatusWidgetController.h"
-#include "UI/Widget/P1SegmentedBarWidget.h"
+#include "UI/Widget/HUD/P1SegmentedBarWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
 #include "Components/ProgressBar.h"

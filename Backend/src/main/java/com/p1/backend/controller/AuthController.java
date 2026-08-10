@@ -26,17 +26,17 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
         try {
-            authService.signup(request.username(), request.password());
-            return ResponseEntity.status(HttpStatus.CREATED).body(new SignupResponse(request.username()));
-        } catch (AuthService.UsernameTakenException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("USERNAME_TAKEN"));
+            authService.signup(request.email(), request.username(), request.password());
+            return ResponseEntity.status(HttpStatus.CREATED).body(new SignupResponse(request.email(), request.username()));
+        } catch (AuthService.EmailTakenException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("EMAIL_TAKEN"));
         }
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            String token = authService.login(request.username(), request.password());
+            String token = authService.login(request.email(), request.password());
             return ResponseEntity.ok(new LoginResponse(token));
         } catch (AuthService.InvalidCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("INVALID_CREDENTIALS"));

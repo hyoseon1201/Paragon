@@ -34,7 +34,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Camp")
 	TSubclassOf<AP1JungleMonsterCharacter> MonsterClass;
 
-	// 몬스터가 죽은 뒤 같은 자리에 다시 스폰하기까지의 대기시간(초).
+	// 캠프 하나가 한 번에 스폰하는 몬스터 수(무리). 1이면 기존과 동일하게 앵커 위치에 단독 스폰,
+	// 2 이상이면 PackSpawnRadius 반경의 원형 배치로 서로 겹치지 않게 각자 다른 위치에 스폰한다.
+	// 각 몬스터의 HomeLocation은 앵커 중심이 아니라 자신이 실제로 스폰된 위치 — 리시 판정도 각자
+	// 자기 자리 기준으로 독립적으로 이뤄진다.
+	UPROPERTY(EditAnywhere, Category = "Camp", meta = (ClampMin = "1"))
+	int32 MonsterCount = 1;
+
+	// MonsterCount>=2일 때 몬스터끼리 겹치지 않도록 원형으로 흩뿌리는 반경(cm). MonsterCount==1이면 무시.
+	UPROPERTY(EditAnywhere, Category = "Camp", meta = (ClampMin = "0.0", EditCondition = "MonsterCount > 1"))
+	float PackSpawnRadius = 200.0f;
+
+	// 몬스터가 죽은 뒤 같은 자리에 다시 스폰하기까지의 대기시간(초) — 무리 전체가 죽은 뒤(CurrentMonsters
+	// 배열이 비는 시점)부터 카운트된다. 무리 중 일부만 죽었을 땐 타이머가 돌지 않는다(나머지가 계속 싸움).
 	UPROPERTY(EditAnywhere, Category = "Camp", meta = (ClampMin = "0.0"))
 	float RespawnDelay = 30.0f;
 
@@ -49,22 +61,33 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MarkerMeshComponent;
 
 	// 매치 경과 시간(분)→몬스터 레벨 매핑 커브(Row="MonsterLevelByMatchTime", Data/CT_MonsterLevelByMatchTime.json
-	// 임포트). 미설정 시 항상 레벨 1로 스폰. GameState에 정식 매치 타이머가 아직 없어서(로드맵 3번 항목,
-	// 미착수) 지금은 GetWorld()->GetTimeSeconds()를 매치 경과 시간으로 대신 쓴다 — 나중에 GameState가
-	// 생기면 그쪽의 권위 있는 매치 시계로 바꿔치기하면 된다(그 전까지는 레벨 시작 시점 = 매치 시작 시점
-	// 이라는 전제가 성립하는 단일 아레나 구조라 근사치로 충분).
+	// 임포트). 미설정 시 항상 레벨 1로 스폰. AP1GameState::GetElapsedMatchTime()(매치 시작 시각 기준
+	// 권위 있는 서버 시계)로 평가한다.
 	UPROPERTY(EditDefaultsOnly, Category = "Camp")
 	TObjectPtr<UCurveTable> MonsterLevelByMatchTimeTable;
 
+public:
+	// 무리 중 한 마리가 맞았을 때(AP1JungleMonsterCharacter::OnHitReactEventReceived) 호출 — 나머지
+	// 생존 개체 전원(SourceMonster 본인 제외)에게도 같은 공격자를 타겟으로 어그로를 전파한다.
+	void NotifyCampAggro(AActor* Attacker, AP1JungleMonsterCharacter* SourceMonster);
+
 private:
+	// 무리 전체(MonsterCount마리)를 스폰 — RespawnTimerHandle이 만료되면 이 함수가 다시 불려 무리
+	// 전체를 재스폰한다(부분 리스폰 없음, 죽은 순서와 무관하게 항상 한 번에 다시 채움).
 	void SpawnMonster();
+	// 배열에서 죽은 몬스터를 제거하고, 무리 전체가 비었을 때만 리스폰 타이머를 시작한다.
 	void OnMonsterDied(AP1JungleMonsterCharacter* DeadMonster);
+
+	// MonsterCount>=2일 때 Index번째 몬스터를 앵커 중심으로부터 원형으로 흩뿌리기 위한 오프셋.
+	// MonsterCount==1이면 항상 ZeroVector(기존 단독 스폰 동작과 동일).
+	FVector ComputeSpawnOffset(int32 Index) const;
 
 	// 현재 매치 경과 시간을 MonsterLevelByMatchTimeTable에 대입해 몬스터 레벨을 계산(1 미만으로는 안 내려감).
 	int32 ComputeMonsterLevel() const;
 
 	FTimerHandle RespawnTimerHandle;
 
+	// 현재 살아있는 무리 구성원 전체 — 죽으면 OnMonsterDied가 제거하고, 비면 리스폰 타이머가 돈다.
 	UPROPERTY()
-	TObjectPtr<AP1JungleMonsterCharacter> CurrentMonster;
+	TArray<TObjectPtr<AP1JungleMonsterCharacter>> CurrentMonsters;
 };

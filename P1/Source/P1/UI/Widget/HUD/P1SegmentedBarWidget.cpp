@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1SegmentedBarWidget.h"
+#include "UI/Widget/HUD/P1SegmentedBarWidget.h"
 #include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Rendering/DrawElements.h"

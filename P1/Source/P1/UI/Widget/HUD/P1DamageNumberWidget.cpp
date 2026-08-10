@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/Widget/P1DamageNumberWidget.h"
+#include "UI/Widget/HUD/P1DamageNumberWidget.h"
 #include "Components/TextBlock.h"
 
 void UP1DamageNumberWidget::SetDamageAmount(float Amount, bool bIsMagicalDamage)
