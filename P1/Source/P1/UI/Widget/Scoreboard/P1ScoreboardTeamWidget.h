@@ -10,9 +10,8 @@ class UPanelWidget;
 class UTextBlock;
 class UP1ScoreboardPlayerRowWidget;
 
-// 점수판의 팀 하나 — 그 팀 소속 플레이어들의 행(UP1ScoreboardPlayerRowWidget)을 담는 컨테이너.
-// 팀 단위 점수 등은 아직 설계되지 않은 종료조건 시스템이 생기면 이 클래스에 추가하면 된다 — 지금은
-// 플레이어 목록만 다룬다(쓰이지 않는 프로퍼티를 미리 만들어두지 않음, 3중 구조 자체가 그 확장 지점).
+// 점수판의 팀 하나 — 그 팀 소속 플레이어들의 행(UP1ScoreboardPlayerRowWidget)을 담는 컨테이너 +
+// 팀 누적 킬스코어(TeamScoreText, 2026-08-12 추가 — 매치 종료 조건 시스템과 함께 도입).
 //
 // 이 위젯은 WBP_Scoreboard의 디자이너에 팀마다 하나씩 "미리 배치"하는 방식이다(런타임 생성 아님) —
 // 팀 수가 고정(AP1ArenaGameMode::NumTeams)이고 배치 위치를 디자이너에서 정하고 싶기 때문. 반대로
@@ -53,4 +52,10 @@ protected:
 	// 팀 구분용 라벨(선택, 예: "Team 0") — 없어도 크래시는 안 나고 라벨만 안 뜬다.
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TeamNameText;
+
+	// 이 팀의 누적 킬스코어(AP1GameState::GetTeamKillScore) — 매치 진행 중엔 Tab 스코어보드에서
+	// 실시간 순위 확인용으로, 매치 종료 후엔 결과창에서 최종 스코어 확인용으로 같은 위젯이 쓰인다
+	// (스코어보드와 결과창이 이 클래스를 공유하므로 둘 다 공짜로 적용됨). 선택 — 없어도 크래시 안 남.
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> TeamScoreText;
 };

@@ -8,6 +8,7 @@
 #include "Player/P1PlayerState.h"
 #include "Player/P1PlayerController.h"
 #include "Characters/P1HeroCharacter.h"
+#include "GameModes/P1ArenaGameMode.h"
 #include "P1.h"
 
 UP1AttributeSet::UP1AttributeSet()
@@ -41,7 +42,7 @@ UP1AttributeSet::UP1AttributeSet()
 
 	InitMovementSpeed(720.0f);
 
-	InitGold(0.0f);
+	InitGold(3000.0f);
 	InitExperience(0.0f);
 }
 
@@ -432,6 +433,14 @@ void UP1AttributeSet::HandleKillRewards(const FGameplayEffectModCallbackData& Da
 		if (AP1HeroCharacter* KillerHero = Cast<AP1HeroCharacter>(KillerPS->GetPawn()))
 		{
 			KillerHero->GrantKillReward(VictimKillStreak, VictimTimeSinceLastDeath, VictimLevel);
+		}
+
+		// 팀 킬스코어 집계 — 승리 임계치 판정/매치 종료 오케스트레이션은 GameMode가 전담(AttributeSet은
+		// "킬이 났다"는 사실과 팀 ID만 전달). Instant GE 실행 컨텍스트라 이 함수 전체가 서버 전용이다
+		// (다른 킬 보상 처리와 동일한 암묵적 전제).
+		if (AP1ArenaGameMode* ArenaGM = World ? World->GetAuthGameMode<AP1ArenaGameMode>() : nullptr)
+		{
+			ArenaGM->OnTeamKillScored(KillerPS->GetGenericTeamId().GetId());
 		}
 	}
 

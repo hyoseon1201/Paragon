@@ -22,12 +22,53 @@ void AP1ArenaGameMode::BeginPlay()
 	if (AP1GameState* P1GS = GetGameState<AP1GameState>())
 	{
 		P1GS->SetMatchStartTime();
-		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 시작 시각 기록 — ServerWorldTime=%.2f (%s)"),
-			P1GS->GetServerWorldTimeSeconds(), *GetName());
+		P1GS->InitializeTeamScores(NumTeams);
+		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 시작 시각 기록 — ServerWorldTime=%.2f, 팀 %d개 점수 초기화 (%s)"),
+			P1GS->GetServerWorldTimeSeconds(), NumTeams, *GetName());
 	}
 	else
 	{
 		UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] BeginPlay — GetGameState<AP1GameState>()가 null, GameStateClass 설정 확인 필요"));
+	}
+}
+
+void AP1ArenaGameMode::OnTeamKillScored(int32 TeamId)
+{
+	AP1GameState* P1GS = GetGameState<AP1GameState>();
+	if (!P1GS || P1GS->GetMatchState() != EP1MatchState::InProgress)
+	{
+		return;
+	}
+
+	P1GS->AddTeamKill(TeamId);
+	const int32 NewScore = P1GS->GetTeamKillScore(TeamId);
+
+	UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] Team %d 킬스코어 %d/%d"), TeamId, NewScore, KillScoreToWin);
+
+	if (NewScore >= KillScoreToWin)
+	{
+		EndMatch(TeamId);
+	}
+}
+
+void AP1ArenaGameMode::EndMatch(int32 WinningTeamId)
+{
+	AP1GameState* P1GS = GetGameState<AP1GameState>();
+	if (!P1GS)
+	{
+		return;
+	}
+
+	P1GS->SetMatchEnded(WinningTeamId);
+
+	UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 종료 — 승리 팀=%d"), WinningTeamId);
+
+	for (APlayerState* PS : P1GS->PlayerArray)
+	{
+		if (AP1PlayerController* P1PC = Cast<AP1PlayerController>(PS ? PS->GetOwner() : nullptr))
+		{
+			P1PC->ClientShowMatchResult(WinningTeamId, ResultScreenDurationSeconds, LobbyMapPath);
+		}
 	}
 }
 

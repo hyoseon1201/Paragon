@@ -63,6 +63,10 @@ void UP1HUDWidget::OnWidgetControllerSet()
 	{
 		InventoryWidget->SetWidgetController(Controller);
 	}
+	else
+	{
+		UE_LOG(LogP1, Warning, TEXT("[HUDWidget] InventoryWidget 바인딩 실패 — WBP_HUD에 'InventoryWidget'이라는 이름의 UP1HUDInventoryWidget 인스턴스가 없습니다. RefreshInventory()가 호출되지 않습니다"));
+	}
 
 	UE_LOG(LogP1, Log, TEXT("[HUDWidget][AbilityIcon] OnWidgetControllerSet — OnAbilityIconAssigned 등 3개 델리게이트 구독 완료. SkillIcon 바인딩: LMB=%s RMB=%s Q=%s E=%s R=%s Passive=%s"),
 		SkillIcon_LMB ? TEXT("O") : TEXT("X(미배치)"),

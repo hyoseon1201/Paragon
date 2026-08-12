@@ -37,7 +37,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Teams")
 	int32 NumTeams = 3;
 
+public:
+	// 한 팀의 누적 킬스코어가 이 값에 도달하면 매치 종료.
+	UPROPERTY(EditDefaultsOnly, Category = "Match")
+	int32 KillScoreToWin = 30;
+
+	// 결과창을 띄워두는 시간(초) — 이후 각 클라이언트가 자동으로 로비로 복귀한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Match")
+	float ResultScreenDurationSeconds = 6.0f;
+
+	// 로비 복귀용 로컬 맵 경로 — 데디케이티드 서버가 없는 완전 로컬 레벨(AP1LobbyGameMode)이라
+	// IP:Port 없이 순수 맵 경로만으로 ClientTravel한다. Scripts/Package_Client.bat이 실제로 쿡하는
+	// 경로(/Game/Maps/PreGame+/Game/Maps/InGame — Arena는 더 이상 쓰지 않는 구 맵)와 반드시 일치시킬 것.
+	UPROPERTY(EditDefaultsOnly, Category = "Match")
+	FString LobbyMapPath = TEXT("/Game/Maps/PreGame");
+
+	// 킬 발생마다 UP1AttributeSet::HandleKillRewards()가 호출 — 해당 팀의 킬스코어를 1 올리고
+	// 승리 임계치 도달 여부를 판정한다. 매치가 이미 종료됐으면 조용히 무시(막타 이후 잔여 데미지 등
+	// 뒤늦게 들어오는 킬 이벤트 방어).
+	void OnTeamKillScored(int32 TeamId);
+
 private:
 	// 다음 플레이어에게 배정할 팀 인덱스 (0→1→...→NumTeams-1→0 순환).
 	int32 NextTeamIndex = 0;
+
+	// GameState 상태를 "종료"로 갱신하고, 전 플레이어에게 결과창 표시 Client RPC를 보낸다.
+	void EndMatch(int32 WinningTeamId);
 };

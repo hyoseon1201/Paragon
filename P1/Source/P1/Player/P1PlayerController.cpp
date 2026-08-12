@@ -14,6 +14,7 @@
 #include "UI/Widget/Scoreboard/P1ScoreboardWidget.h"
 #include "UI/WidgetController/P1ScoreboardWidgetController.h"
 #include "UI/Widget/Shop/P1ShopWidget.h"
+#include "UI/Widget/MatchResult/P1MatchResultWidget.h"
 #include "UI/HUD/P1HUD.h"
 #include "Blueprint/UserWidget.h"
 #include "P1.h"
@@ -251,6 +252,56 @@ void AP1PlayerController::CloseShop()
 	}
 	SetInputMode(FInputModeGameOnly());
 	bShowMouseCursor = false;
+}
+
+void AP1PlayerController::ClientShowMatchResult_Implementation(int32 WinningTeamId, float ResultScreenDurationSeconds, const FString& LobbyMapPath)
+{
+	if (!MatchResultWidgetClass)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[MatchResult] MatchResultWidgetClass 미설정 — BP_P1PlayerController에서 지정하세요."));
+		return;
+	}
+
+	if (!MatchResultWidgetInstance)
+	{
+		MatchResultWidgetInstance = CreateWidget<UP1MatchResultWidget>(this, MatchResultWidgetClass);
+		if (MatchResultWidgetInstance)
+		{
+			// 스코어보드와 동일한 컨트롤러 타입(델리게이트 없이 GameState 접근만 제공) 재사용 —
+			// 결과창 전용 컨트롤러 클래스를 따로 만들 필요가 없다.
+			UP1ScoreboardWidgetController* Controller = NewObject<UP1ScoreboardWidgetController>(this);
+			Controller->SetWidgetControllerParams(FWidgetControllerParams(this, PlayerState, nullptr, nullptr));
+			MatchResultWidgetInstance->SetWidgetController(Controller);
+			MatchResultWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (!MatchResultWidgetInstance)
+	{
+		return;
+	}
+
+	MatchResultWidgetInstance->SetWinningTeamId(WinningTeamId);
+	MatchResultWidgetInstance->RefreshResult();
+	MatchResultWidgetInstance->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+
+	// 매치가 끝났으니 더 이상 게임 입력이 필요 없는 모달 화면 — 상점(GameAndUI, WASD 유지)과 달리
+	// 완전히 UI 전용으로 전환.
+	SetInputMode(FInputModeUIOnly());
+	bShowMouseCursor = true;
+
+	UE_LOG(LogP1, Log, TEXT("[MatchResult] 결과창 표시 — 승리 팀=%d, %.1f초 후 로비(%s) 복귀"),
+		WinningTeamId, ResultScreenDurationSeconds, *LobbyMapPath);
+
+	GetWorldTimerManager().ClearTimer(MatchResultReturnTimerHandle);
+	GetWorldTimerManager().SetTimer(MatchResultReturnTimerHandle, FTimerDelegate::CreateUObject(
+		this, &AP1PlayerController::ReturnToLobby, LobbyMapPath), ResultScreenDurationSeconds, false);
+}
+
+void AP1PlayerController::ReturnToLobby(FString LobbyMapPath)
+{
+	UE_LOG(LogP1, Log, TEXT("[MatchResult] 로비로 복귀 — ClientTravel(%s)"), *LobbyMapPath);
+	ClientTravel(LobbyMapPath, ETravelType::TRAVEL_Absolute);
 }
 
 void AP1PlayerController::HandleAbilityInputPressed(FGameplayTag InputTag)

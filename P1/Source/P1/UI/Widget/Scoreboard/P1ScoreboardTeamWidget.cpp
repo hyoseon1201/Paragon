@@ -16,6 +16,19 @@ void UP1ScoreboardTeamWidget::RefreshTeam()
 		TeamNameText->SetText(FText::FromString(FString::Printf(TEXT("Team %d"), DesignatedTeamId)));
 	}
 
+	// 팀 킬스코어 — PlayerListContainer/PlayerRowWidgetClass 바인딩 여부와 무관하게 먼저 갱신해둔다
+	// (아래에서 그 둘이 없으면 조기 리턴하는데, 스코어 표시는 그거랑 상관없이 항상 최신이어야 하므로).
+	if (TeamScoreText)
+	{
+		if (UP1ScoreboardWidgetController* ScoreController = Cast<UP1ScoreboardWidgetController>(WidgetController))
+		{
+			if (AP1GameState* ScoreGameState = ScoreController->GetP1GameState())
+			{
+				TeamScoreText->SetText(FText::AsNumber(ScoreGameState->GetTeamKillScore(DesignatedTeamId)));
+			}
+		}
+	}
+
 	if (!PlayerListContainer || !PlayerRowWidgetClass)
 	{
 		// 진단용 — 어느 인스턴스가, 어느 프로퍼티가 비어있는지 정확히 찍는다(WBP_Scoreboard에 배치한

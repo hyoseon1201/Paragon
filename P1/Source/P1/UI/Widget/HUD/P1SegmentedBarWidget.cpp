@@ -5,6 +5,7 @@
 #include "Components/TextBlock.h"
 #include "Rendering/DrawElements.h"
 #include "Styling/AppStyle.h"
+#include "P1.h"
 
 int32 UP1SegmentedBarWidget::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry,
 	const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
@@ -88,6 +89,8 @@ void UP1SegmentedBarWidget::SetValues(float NewCurrent, float NewMax, float NewR
 	CurrentValue = FMath::Max(0.f, NewCurrent);
 	MaxValue     = FMath::Max(1.f, NewMax);
 	RegenValue   = NewRegen;
+	UE_LOG(LogP1, Log, TEXT("[SegmentedBar] SetValues(%s) — Current=%.0f Max=%.0f Regen=%.1f ValueText바인딩=%d"),
+		*GetName(), CurrentValue, MaxValue, RegenValue, ValueText != nullptr);
 	RefreshDisplay();
 }
 

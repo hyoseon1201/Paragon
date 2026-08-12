@@ -42,23 +42,33 @@ void UP1ShopItemSlotWidget::SetSlotData(AP1PlayerState* InPlayerState, FName InI
 
 void UP1ShopItemSlotWidget::HandleSelectClicked()
 {
-	if (!ItemRowName.IsNone())
+	if (ItemRowName.IsNone())
 	{
-		OnSelected.Broadcast(ItemRowName);
+		return;
 	}
-}
 
-FReply UP1ShopItemSlotWidget::NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
+	OnSelected.Broadcast(ItemRowName);
+
+	// 더블클릭 판정 — SelectButton이 칸 전체를 덮어 마우스 입력을 먼저 가로채므로
+	// NativeOnMouseButtonDoubleClick은 쓸 수 없다(위 헤더 주석 참고). 대신 OnClicked가
+	// DoubleClickThresholdSeconds 안에 두 번 들어오면 구매로 취급한다.
+	constexpr double DoubleClickThresholdSeconds = 0.35;
+	const double CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	const bool bIsDoubleClick = LastClickTimeSeconds >= 0.0 && (CurrentTimeSeconds - LastClickTimeSeconds) <= DoubleClickThresholdSeconds;
+	LastClickTimeSeconds = bIsDoubleClick ? -1.0 : CurrentTimeSeconds;
+
+	if (!bIsDoubleClick)
+	{
+		return;
+	}
+
 	if (AP1PlayerState* PS = OwningPlayerState.Get())
 	{
 		// 서버도 어차피 중복 보유를 거부하지만(ServerBuyItem), 이미 보유 중인 아이템은 애초에 RPC를
 		// 보내지 않고 클라이언트에서 조용히 막는다.
-		if (!ItemRowName.IsNone() && !PS->GetInventory().Contains(ItemRowName))
+		if (!PS->GetInventory().Contains(ItemRowName))
 		{
 			PS->ServerBuyItem(ItemRowName);
 		}
 	}
-
-	return Super::NativeOnMouseButtonDoubleClick(InGeometry, InMouseEvent);
 }

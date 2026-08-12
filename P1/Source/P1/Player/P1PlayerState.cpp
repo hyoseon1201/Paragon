@@ -198,15 +198,32 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 
 		if (ItemData->StatEffectClass)
 		{
-			AppliedHandles.Add(ASC->ApplyGameplayEffectToSelf(
-				ItemData->StatEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext));
+			const FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectToSelf(
+				ItemData->StatEffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext);
+			UE_LOG(LogP1, Log, TEXT("[Shop]   StatEffectClass 적용 — %s | GE=%s | 핸들유효=%d"),
+				*ItemRowName.ToString(), *ItemData->StatEffectClass->GetName(), Handle.IsValid());
+			AppliedHandles.Add(Handle);
 		}
+		else
+		{
+			UE_LOG(LogP1, Warning, TEXT("[Shop]   StatEffectClass 미설정 — %s | DT_ShopItems 행의 StatEffectClass를 DataTable 에디터에서 지정해야 함"),
+				*ItemRowName.ToString());
+		}
+
 		for (const FP1ItemUniqueAbility& Ability : ItemData->UniqueAbilities)
 		{
 			if (Ability.EffectClass)
 			{
-				AppliedHandles.Add(ASC->ApplyGameplayEffectToSelf(
-					Ability.EffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext));
+				const FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectToSelf(
+					Ability.EffectClass->GetDefaultObject<UGameplayEffect>(), 1.0f, EffectContext);
+				UE_LOG(LogP1, Log, TEXT("[Shop]   UniqueAbility GE 적용 — %s | Ability=%s | GE=%s | 핸들유효=%d"),
+					*ItemRowName.ToString(), *Ability.AbilityName.ToString(), *Ability.EffectClass->GetName(), Handle.IsValid());
+				AppliedHandles.Add(Handle);
+			}
+			else
+			{
+				UE_LOG(LogP1, Warning, TEXT("[Shop]   UniqueAbility EffectClass 미설정 — %s | Ability=%s"),
+					*ItemRowName.ToString(), *Ability.AbilityName.ToString());
 			}
 		}
 

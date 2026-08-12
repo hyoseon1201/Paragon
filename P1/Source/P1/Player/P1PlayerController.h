@@ -12,6 +12,7 @@ class UInputAction;
 struct FInputActionValue;
 class AP1DamageNumberActor;
 class UP1ScoreboardWidget;
+class UP1MatchResultWidget;
 
 UCLASS()
 class P1_API AP1PlayerController : public APlayerController
@@ -80,6 +81,13 @@ public:
 	// 그대로 남는다 — 반드시 이 함수를 통해서 닫을 것.
 	void CloseShop();
 
+	// AP1ArenaGameMode::EndMatch()가 매치 종료 시 전원에게 호출 — 결과창을 띄우고 입력모드를 UI 전용으로
+	// 바꾼 뒤, ResultScreenDurationSeconds 후 자동으로 LobbyMapPath로 ClientTravel한다. Duration/맵 경로를
+	// GameMode가 RPC 파라미터로 실어 보내는 이유는 그 값을 GameMode 한 곳에서만 관리하기 위함
+	// (PlayerController가 별도로 같은 값을 EditDefaultsOnly로 중복해서 안 들고 있어도 됨).
+	UFUNCTION(Client, Reliable)
+	void ClientShowMatchResult(int32 WinningTeamId, float ResultScreenDurationSeconds, const FString& LobbyMapPath);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<AP1DamageNumberActor> DamageNumberActorClass;
@@ -88,9 +96,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UP1ScoreboardWidget> ScoreboardWidgetClass;
 
+	// WBP_MatchResult(parent=UP1MatchResultWidget) 지정.
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UP1MatchResultWidget> MatchResultWidgetClass;
+
 private:
 	// 처음 Tab을 누를 때 지연 생성 — 뷰포트에 올라간 채로 Visibility만 토글한다(홀드마다 새로 만들지
 	// 않음). Collapsed 상태로 시작해 첫 표시 전까지 화면을 가리지 않는다.
 	UPROPERTY()
 	TObjectPtr<UP1ScoreboardWidget> ScoreboardWidgetInstance;
+
+	// 매치당 한 번만 뜨는 화면이라 Scoreboard처럼 재사용 인스턴스를 캐싱해두지 않는다 — 생성 즉시 표시.
+	UPROPERTY()
+	TObjectPtr<UP1MatchResultWidget> MatchResultWidgetInstance;
+
+	FTimerHandle MatchResultReturnTimerHandle;
+
+	// ClientShowMatchResult()가 예약한 타이머가 만료되면 호출 — 로컬(데디케이티드 서버가 없는) PreGame
+	// 맵으로 개별 ClientTravel. IP:Port가 없는 순수 맵 경로이므로 각 클라이언트가 독립적으로 Arena
+	// 서버 접속을 끊고 로컬 레벨을 로드한다.
+	void ReturnToLobby(FString LobbyMapPath);
 };

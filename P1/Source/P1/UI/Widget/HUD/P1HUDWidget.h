@@ -12,6 +12,7 @@ class UP1SegmentedBarWidget;
 class UP1SkillIconWidget;
 class UP1OverlayWidgetController;
 class UP1HUDInventoryWidget;
+class UP1MinimapWidget;
 class UTexture2D;
 class UTextBlock;
 
@@ -79,6 +80,11 @@ protected:
 	// 데이터를 보여주지만 판매 인터랙션은 없다(WBP_HUDInventory, UP1HUDInventoryWidget 참고).
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UP1HUDInventoryWidget> InventoryWidget;
+
+	// ---- 미니맵(Optional) ---- 자기 완결적으로 폴링하는 위젯이라 컨트롤러 전파가 필요 없음
+	// (UP1MinimapWidget 자체 주석 참고).
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UP1MinimapWidget> MinimapWidget;
 
 private:
 	// 컨트롤러 델리게이트 핸들러 — float 직접 수신

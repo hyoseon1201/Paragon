@@ -180,6 +180,10 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 
 		if (AP1HUD* P1HUD = PC->GetHUD<AP1HUD>())
 		{
+			const UP1AttributeSet* AttrSetForLog = P1PS->GetAttributeSet();
+			UE_LOG(LogP1, Log, TEXT("[HUD] InitOverlay 호출 직전 — MaxHealth(로컬 AttributeSet)=%.0f HasAuthority=%d IsLocallyControlled=%d (%s)"),
+				AttrSetForLog ? AttrSetForLog->GetMaxHealth() : -1.0f, HasAuthority(), IsLocallyControlled(), *GetName());
+
 			P1HUD->InitOverlay(PC, P1PS, ASC, P1PS->GetAttributeSet());
 			P1HUD->InitShop(PC, P1PS, ASC, P1PS->GetAttributeSet());
 		}
@@ -595,22 +599,28 @@ void AP1HeroCharacter::ApplyBaseStatsForLevel(int32 Level, bool bFullHeal)
 	float ManaAmount;
 	if (bFullHeal)
 	{
-		// 스폰/리스폰 — 완전 회복.
-		HealAmount = FMath::Max(0.0f, NewMaxHealth - OldHealth);
-		ManaAmount = FMath::Max(0.0f, NewMaxMana - OldMana);
+		// 스폰/리스폰 — 완전 회복. 새 MaxHealth/MaxMana가 기존 Health/Mana보다 낮아질 수도 있다(예:
+		// AttributeSet 생성자 기본값이 680인데 이 영웅의 레벨1 DefaultAttributesEffect가 실제로는
+		// 665를 줄 때 — 최초 스폰 시 Health는 아직 680인 채로 남아있음). 0으로 클램프하면 이 경우
+		// 델타가 음수여도 무시되어 Health가 새 Max보다 높은 상태로 영원히 남는 버그가 났었다
+		// (2026-08-11) — 완전 회복은 방향에 상관없이 정확히 새 Max로 맞춰야 하므로 클램프하지 않는다.
+		HealAmount = NewMaxHealth - OldHealth;
+		ManaAmount = NewMaxMana - OldMana;
 	}
 	else
 	{
-		// 레벨업 — 최대치가 늘어난 만큼만 현재치도 늘어난다(공짜 완전회복 아님).
+		// 레벨업 — 최대치가 늘어난 만큼만 현재치도 늘어난다(공짜 완전회복 아님, 레벨업으로 줄어들 일은 없음).
 		HealAmount = FMath::Max(0.0f, NewMaxHealth - OldMaxHealth);
 		ManaAmount = FMath::Max(0.0f, NewMaxMana - OldMaxMana);
 	}
 
-	if (HealAmount > 0.0f)
+	// HealEffectClass/ManaRestoreEffectClass의 Modifier가 Additive+SetByCaller라 음수 값도 그대로
+	// 감산으로 정상 동작한다 — 별도의 "감소" GE가 필요 없다.
+	if (HealAmount != 0.0f)
 	{
 		ApplyFlatRestoreEffect(HealEffectClass, TAG_Data_Heal_Flat, HealAmount);
 	}
-	if (ManaAmount > 0.0f)
+	if (ManaAmount != 0.0f)
 	{
 		ApplyFlatRestoreEffect(ManaRestoreEffectClass, TAG_Data_Mana_Flat, ManaAmount);
 	}

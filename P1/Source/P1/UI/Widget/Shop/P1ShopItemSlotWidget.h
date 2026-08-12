@@ -35,9 +35,6 @@ public:
 protected:
 	virtual void NativeConstruct() override;
 
-	// 더블클릭으로 구매 — WBP 루트의 Visibility가 Visible이어야 이벤트를 받는다(SelfHitTestInvisible이면 안 들어옴).
-	virtual FReply NativeOnMouseButtonDoubleClick(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> IconImage;
 
@@ -59,4 +56,10 @@ private:
 
 	TWeakObjectPtr<AP1PlayerState> OwningPlayerState;
 	FName ItemRowName;
+
+	// UButton엔 OnDoubleClicked 이벤트가 없고, SelectButton이 칸 전체를 덮고 있어 마우스 입력을
+	// 먼저 가로채는 바람에 NativeOnMouseButtonDoubleClick(부모 위젯 자신이 히트테스트 대상일 때만
+	// 호출됨)은 실제로 발동하지 않는다 — 대신 OnClicked가 짧은 시간 안에 두 번 오는지로 더블클릭을
+	// 직접 판정한다.
+	double LastClickTimeSeconds = -1.0;
 };

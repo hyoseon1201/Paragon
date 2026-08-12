@@ -13,7 +13,11 @@ void UP1OverlayWidgetController::BroadcastInitialValues()
 {
 	bool bFound = false;
 	OnHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetHealthAttribute(), bFound));
-	OnMaxHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxHealthAttribute(), bFound));
+	const float BroadcastMaxHealth = AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxHealthAttribute(), bFound);
+	UE_LOG(LogP1, Log, TEXT("[OverlayWC] BroadcastInitialValues — MaxHealth=%.0f (bFound=%d) HasAuthority=%d Owner=%s"),
+		BroadcastMaxHealth, bFound, AbilitySystemComponent->GetOwnerActor() ? AbilitySystemComponent->GetOwnerActor()->HasAuthority() : -1,
+		*GetNameSafe(AbilitySystemComponent->GetOwnerActor()));
+	OnMaxHealthChanged.Broadcast(BroadcastMaxHealth);
 	OnHealthRegenChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetHealthRegenAttribute(), bFound));
 	OnManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFound));
 	OnMaxManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxManaAttribute(), bFound));

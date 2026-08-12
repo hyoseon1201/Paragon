@@ -23,7 +23,8 @@ void UP1PreGameHUDWidget::NativeConstruct()
 		SignupWidget->OnRequestLoginScreen.AddDynamic(this, &UP1PreGameHUDWidget::HandleRequestLoginScreen);
 	}
 
-	if (UP1BackendSubsystem* Backend = GetBackendSubsystem())
+	UP1BackendSubsystem* Backend = GetBackendSubsystem();
+	if (Backend)
 	{
 		Backend->OnSignupComplete.AddDynamic(this, &UP1PreGameHUDWidget::HandleSignupComplete);
 		Backend->OnLoginComplete.AddDynamic(this, &UP1PreGameHUDWidget::HandleLoginComplete);
@@ -35,7 +36,11 @@ void UP1PreGameHUDWidget::NativeConstruct()
 		UE_LOG(LogP1, Warning, TEXT("[Lobby] UP1BackendSubsystem을 찾을 수 없습니다"));
 	}
 
-	ShowScreen(EP1LobbyScreen::Login);
+	// UP1BackendSubsystem은 GameInstanceSubsystem이라 ClientTravel(매치 종료 후 로비 복귀 등)에도
+	// 살아남는다 — 이 위젯/PlayerController/PlayerState는 레벨 전환마다 전부 새로 만들어지지만,
+	// 로그인 토큰만은 거기 그대로 남아있으므로 그 유무로 시작 화면을 다시 판단한다("이전 화면 상태를
+	// 복원"하는 게 아니라, 유일하게 남은 근거로 매번 새로 도출).
+	ShowScreen(Backend && Backend->IsLoggedIn() ? EP1LobbyScreen::MatchQueue : EP1LobbyScreen::Login);
 }
 
 void UP1PreGameHUDWidget::HandleRequestSignupScreen()
