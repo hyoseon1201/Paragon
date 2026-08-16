@@ -5,6 +5,7 @@
 #include "AbilitySystem/P1GameplayAbility.h"
 #include "Player/P1PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "GameplayEffect.h"
 #include "P1.h"
 
 void UP1AbilitySystemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -26,6 +27,62 @@ void UP1AbilitySystemComponent::OnRep_AbilitiesGiven()
 	UE_LOG(LogP1, Log, TEXT("[ASC][AbilitiesGiven] OnRep_AbilitiesGiven() 호출(리플리케이트 수신) — Owner=%s | AbilitiesGivenDelegate 브로드캐스트"),
 		GetOwnerActor() ? *GetOwnerActor()->GetName() : TEXT("null"));
 	AbilitiesGivenDelegate.Broadcast();
+}
+
+void UP1AbilitySystemComponent::ReduceCooldownByInputTag(FGameplayTag InputTag, float Percent)
+{
+	if (!GenericCooldownReductionEffectClass)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[ASC][CooldownReduction] GenericCooldownReductionEffectClass 미설정 — %s 감소 스킵"), *InputTag.ToString());
+		return;
+	}
+
+	for (FGameplayAbilitySpec& Spec : GetActivatableAbilities())
+	{
+		if (!Spec.Ability || !Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
+		{
+			continue;
+		}
+
+		const FGameplayTagContainer* CooldownTags = Spec.Ability->GetCooldownTags();
+		if (!CooldownTags || CooldownTags->IsEmpty())
+		{
+			return; // 이 어빌리티는 쿨다운 GE 자체가 없음(예: 좌클릭) — 줄일 게 없음.
+		}
+
+		const FGameplayEffectQuery Query = FGameplayEffectQuery::MakeQuery_MatchAnyOwningTags(*CooldownTags);
+		const TArray<float> Remaining = GetActiveEffectsTimeRemaining(Query);
+
+		float MaxRemaining = 0.0f;
+		for (const float R : Remaining)
+		{
+			MaxRemaining = FMath::Max(MaxRemaining, R);
+		}
+		if (MaxRemaining <= 0.0f)
+		{
+			return; // 지금 쿨다운 중이 아니면 줄일 게 없음(조용히 무시).
+		}
+
+		// 남은 시간을 (1-Percent)로 재적용해 감소 — AssaultTheGates::ReduceCooldown()과 동일한 방식을
+		// 여러 어빌리티에 범용으로 적용한 버전(이 어빌리티 전용 쿨다운 GE를 건드리지 않고, 공용 GE에
+		// 그 어빌리티의 쿨다운 태그를 동적으로 실어서 대체).
+		const float ReducedRemaining = MaxRemaining * (1.0f - Percent);
+		RemoveActiveEffectsWithGrantedTags(*CooldownTags);
+
+		FGameplayEffectContextHandle EffectContext = MakeEffectContext();
+		EffectContext.AddSourceObject(GetAvatarActor());
+		const FGameplayEffectSpecHandle SpecHandle = MakeOutgoingSpec(GenericCooldownReductionEffectClass, 1.0f, EffectContext);
+		if (SpecHandle.IsValid())
+		{
+			SpecHandle.Data->SetSetByCallerMagnitude(TAG_Data_CooldownDuration, ReducedRemaining);
+			SpecHandle.Data->DynamicGrantedTags.AppendTags(*CooldownTags);
+			ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+		}
+
+		UE_LOG(LogP1, Log, TEXT("[ASC][CooldownReduction] %s 남은시간 %.2f → %.2f (%.0f%% 감소)"),
+			*InputTag.ToString(), MaxRemaining, ReducedRemaining, Percent * 100.0f);
+		return;
+	}
 }
 
 void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)

@@ -2,18 +2,18 @@
 
 #include "UI/Widget/Minimap/P1MinimapWidget.h"
 #include "UI/Widget/Minimap/P1MinimapIconWidget.h"
+#include "UI/Widget/Minimap/P1MinimapCampIconWidget.h"
 #include "Components/Image.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "GameModes/P1GameState.h"
 #include "Player/P1PlayerState.h"
 #include "AI/P1JungleCampAnchor.h"
-#include "Characters/P1JungleMonsterCharacter.h"
+#include "Characters/P1HeroCharacter.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "EngineUtils.h"
-#include "P1.h"
 
 void UP1MinimapWidget::NativeConstruct()
 {
@@ -24,30 +24,37 @@ void UP1MinimapWidget::NativeConstruct()
 	{
 		for (TActorIterator<AP1JungleCampAnchor> It(World); It; ++It)
 		{
-			CachedCampLocations.Add(It->GetActorLocation());
+			CachedCampAnchors.Add(*It);
 		}
 	}
 
-	if (!IconWidgetClass)
+	if (CampIconWidgetClass && MinimapIconContainer)
 	{
-		UE_LOG(LogP1, Warning, TEXT("[Minimap] IconWidgetClass 미설정 — WBP_Minimap Class Defaults에서 지정하세요."));
-	}
-	else if (MinimapIconContainer)
-	{
-		for (const FVector& CampLocation : CachedCampLocations)
+		for (AP1JungleCampAnchor* CampAnchor : CachedCampAnchors)
 		{
-			UP1MinimapIconWidget* CampIcon = CreateWidget<UP1MinimapIconWidget>(GetOwningPlayer(), IconWidgetClass);
+			if (!IsValid(CampAnchor))
+			{
+				continue;
+			}
+
+			UP1MinimapCampIconWidget* CampIcon = CreateWidget<UP1MinimapCampIconWidget>(GetOwningPlayer(), CampIconWidgetClass);
 			if (!CampIcon)
 			{
 				continue;
 			}
 
 			CampIcon->SetIconColor(CampIconColor);
-			CampIcon->SetVisibility(ESlateVisibility::Collapsed);
+			// 안개 시스템상 캠프 아이콘은 항상 보인다(생사와 무관 — 팀이 죽음을 확인 못했으면 계속
+			// "살아있음"으로 스테일 표시된다, 아래 RefreshMinimap 참고) — Collapsed로 시작하지 않는다.
+			CampIcon->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 
+			// 위치는 여기서 굳이 안 잡는다 — NativeConstruct 시점엔 MinimapIconContainer의 레이아웃이
+			// 아직 계산되기 전이라(GetCachedGeometry가 크기 0을 반환) 좌표 변환이 전부 (0,0)으로
+			// 나온다. 플레이어 아이콘과 동일하게 RefreshMinimap()이 매 틱 다시 계산해서 채워준다.
 			if (UCanvasPanelSlot* CanvasSlot = MinimapIconContainer->AddChildToCanvas(CampIcon))
 			{
-				CanvasSlot->SetPosition(WorldToMinimapLocal(FVector2D(CampLocation)));
+				CanvasSlot->SetAutoSize(true); // 위젯 디자인 크기 그대로 사용 — Size To Content.
+				CanvasSlot->SetAlignment(FVector2D(0.5f, 0.5f)); // SetPosition 기준점을 좌상단이 아닌 중심으로.
 			}
 
 			CampIconPool.Add(CampIcon);
@@ -72,10 +79,12 @@ void UP1MinimapWidget::NativeDestruct()
 
 FVector2D UP1MinimapWidget::WorldToMinimapLocal(const FVector2D& WorldXY) const
 {
+	// 미니맵 이미지의 가로축은 월드 Y, 세로축은 월드 X에 대응한다(캡처한 Top뷰 기준 실측 보정 —
+	// WorldXY.X/Y를 그대로 Local.X/Y에 매칭하면 좌우/상하가 뒤바뀐다).
 	const FVector2D BoundsSize = WorldBoundsMax - WorldBoundsMin;
 	const FVector2D Alpha(
-		BoundsSize.X != 0.0 ? (WorldXY.X - WorldBoundsMin.X) / BoundsSize.X : 0.0,
-		BoundsSize.Y != 0.0 ? (WorldXY.Y - WorldBoundsMin.Y) / BoundsSize.Y : 0.0);
+		BoundsSize.Y != 0.0 ? (WorldXY.Y - WorldBoundsMin.Y) / BoundsSize.Y : 0.0,
+		BoundsSize.X != 0.0 ? (WorldXY.X - WorldBoundsMin.X) / BoundsSize.X : 0.0);
 
 	const FVector2D ContainerSize = MinimapIconContainer
 		? MinimapIconContainer->GetCachedGeometry().GetLocalSize()
@@ -86,7 +95,12 @@ FVector2D UP1MinimapWidget::WorldToMinimapLocal(const FVector2D& WorldXY) const
 
 FLinearColor UP1MinimapWidget::GetColorForTeam(uint8 TeamId) const
 {
-	return TeamColors.IsValidIndex(TeamId) ? TeamColors[TeamId] : FLinearColor::White;
+	// WBP Class Defaults의 Alpha가 에디터 표시값(1.0)과 무관하게 런타임 CDO에서 0으로 직렬화되는
+	// 현상이 확인됨(TeamColors 전 항목 동일 현상) — 팀 테두리는 항상 완전 불투명이어야 하므로
+	// Alpha는 배열 값을 신뢰하지 않고 여기서 강제한다.
+	FLinearColor Color = TeamColors.IsValidIndex(TeamId) ? TeamColors[TeamId] : FLinearColor::White;
+	Color.A = 1.0f;
+	return Color;
 }
 
 void UP1MinimapWidget::RefreshMinimap()
@@ -169,15 +183,28 @@ void UP1MinimapWidget::RefreshMinimap()
 			{
 				continue;
 			}
-			MinimapIconContainer->AddChildToCanvas(Icon);
+			if (UCanvasPanelSlot* NewSlot = MinimapIconContainer->AddChildToCanvas(Icon))
+			{
+				NewSlot->SetAutoSize(true); // 위젯 디자인 크기 그대로 사용 — Size To Content.
+				NewSlot->SetAlignment(FVector2D(0.5f, 0.5f)); // SetPosition 기준점을 좌상단이 아닌 중심으로.
+			}
 			PlayerIconPool.Add(P1PS, Icon);
 		}
 
 		Icon->SetIconColor(GetColorForTeam(P1PS->GetGenericTeamId().GetId()));
+
+		// 영웅 초상화는 스폰된 Pawn의 실제 클래스(CDO)에서 읽는다 — 영웅 BP마다 다른 값이라 리플리케이션이
+		// 필요 없다(원격 클라이언트도 이미 표준 액터 클래스 리플리케이션으로 어떤 영웅인지 알고 있음).
+		if (const AP1HeroCharacter* HeroCDO = Cast<AP1HeroCharacter>(Pawn->GetClass()->GetDefaultObject()))
+		{
+			Icon->SetPortraitTexture(HeroCDO->GetHeroPortrait());
+		}
+
 		Icon->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		const FVector2D LocalPos = WorldToMinimapLocal(FVector2D(Pawn->GetActorLocation()));
 		if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Icon->Slot))
 		{
-			CanvasSlot->SetPosition(WorldToMinimapLocal(FVector2D(Pawn->GetActorLocation())));
+			CanvasSlot->SetPosition(LocalPos);
 		}
 	}
 
@@ -195,25 +222,59 @@ void UP1MinimapWidget::RefreshMinimap()
 		}
 	}
 
-	// 3. 캠프 아이콘 — 캠프 위치 CampDetectionRadius 안에 살아있는 몬스터가 있으면 표시.
-	const float CampDetectionRadiusSq = FMath::Square(CampDetectionRadius);
-	for (int32 Index = 0; Index < CachedCampLocations.Num(); ++Index)
+	// 3. 캠프 아이콘 — 실제 생사가 아니라 "우리 팀이 확인했는가"(팀 공유 안개)만 반영한다. 미확인
+	// 상태에선 실제로 죽었어도 계속 "살아있음"으로 스테일 표시되고, 확인되면 다이아몬드를 어둡게
+	// 칠하고 남은 리스폰 시간을 카운트다운으로 보여준다. 부활은 확인 여부와 무관하게 즉시 반영되는데,
+	// 이는 AP1JungleCampAnchor::RespawnServerTime이 리스폰 순간 -1로 리셋되기 때문에 별도 분기 없이
+	// 자연히 성립한다.
+	// 캠프 위치는 고정이라 한 번만 계산하면 되지만, NativeConstruct 시점엔 컨테이너 레이아웃이 아직
+	// 안 잡혀있어(GetCachedGeometry가 크기 0을 반환) 그때 바로 계산하면 전부 (0,0)으로 어긋난다 —
+	// 컨테이너 크기가 유효해지는 첫 틱에 딱 한 번만 위치를 확정하고 이후로는 건너뛴다.
+	if (!bCampIconsPositioned)
 	{
-		if (!CampIconPool.IsValidIndex(Index) || !CampIconPool[Index])
+		const FVector2D ContainerSize = MinimapIconContainer->GetCachedGeometry().GetLocalSize();
+		if (!ContainerSize.IsNearlyZero())
+		{
+			for (int32 Index = 0; Index < CachedCampAnchors.Num(); ++Index)
+			{
+				AP1JungleCampAnchor* CampAnchor = CachedCampAnchors[Index];
+				if (!CampIconPool.IsValidIndex(Index) || !CampIconPool[Index] || !IsValid(CampAnchor))
+				{
+					continue;
+				}
+
+				if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(CampIconPool[Index]->Slot))
+				{
+					CanvasSlot->SetPosition(WorldToMinimapLocal(FVector2D(CampAnchor->GetActorLocation())));
+				}
+			}
+			bCampIconsPositioned = true;
+		}
+	}
+
+	for (int32 Index = 0; Index < CachedCampAnchors.Num(); ++Index)
+	{
+		AP1JungleCampAnchor* CampAnchor = CachedCampAnchors[Index];
+		if (!CampIconPool.IsValidIndex(Index) || !CampIconPool[Index] || !IsValid(CampAnchor))
 		{
 			continue;
 		}
 
-		bool bCampAlive = false;
-		for (TActorIterator<AP1JungleMonsterCharacter> It(World); It; ++It)
-		{
-			if (FVector::DistSquared(It->GetActorLocation(), CachedCampLocations[Index]) <= CampDetectionRadiusSq)
-			{
-				bCampAlive = true;
-				break;
-			}
-		}
+		UP1MinimapCampIconWidget* CampIcon = CampIconPool[Index];
+		const float CampRespawnServerTime = CampAnchor->GetRespawnServerTime();
+		const bool bTeamConfirmedDead = CampRespawnServerTime >= 0.0f && CampAnchor->HasTeamObservedDeath(LocalTeamId);
 
-		CampIconPool[Index]->SetVisibility(bCampAlive ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
+		if (bTeamConfirmedDead)
+		{
+			FLinearColor DimmedColor = CampIconColor;
+			DimmedColor.A = 0.3f;
+			CampIcon->SetIconColor(DimmedColor);
+			CampIcon->SetCountdownSeconds(CampRespawnServerTime - GameState->GetServerWorldTimeSeconds());
+		}
+		else
+		{
+			CampIcon->SetIconColor(CampIconColor);
+			CampIcon->ClearCountdown();
+		}
 	}
 }

@@ -8,7 +8,9 @@
 #include "Player/P1PlayerState.h"
 #include "Player/P1PlayerController.h"
 #include "Characters/P1HeroCharacter.h"
+#include "Characters/P1JungleMonsterCharacter.h"
 #include "GameModes/P1ArenaGameMode.h"
+#include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "P1.h"
 
 UP1AttributeSet::UP1AttributeSet()
@@ -173,6 +175,9 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 
 			// 어시스트 판정용 — 실제로 관통된 데미지만 "기여"로 기록(무적/디플렉트는 애초에 이 분기 진입 안 함).
 			RecordDamageContribution(Data);
+
+			// 애쉬브링어 크로노 스트라이크 — 생존/사망 여부와 무관하게 적중 자체로 발동(막타여도 발동).
+			HandleChronoStrikeProc(Data);
 
 			// 사망 감지 — State.Dead가 이미 있으면(중복 판정 등) 재발신하지 않는다.
 			// GE 적용 자체는 캐릭터 클래스에 위임한다(AttributeSet은 캐릭터 타입을 몰라야 함).
@@ -401,14 +406,50 @@ void UP1AttributeSet::RecordDamageContribution(const FGameplayEffectModCallbackD
 	RecentDamageContributors.Add(InstigatorPS, World ? World->GetTimeSeconds() : 0.0f);
 }
 
+void UP1AttributeSet::HandleChronoStrikeProc(const FGameplayEffectModCallbackData& Data)
+{
+	const FGameplayTagContainer* SourceTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
+	if (!SourceTags || !SourceTags->HasTag(TAG_Ability_BasicAttack))
+	{
+		return;
+	}
+
+	AP1PlayerState* InstigatorPS = Cast<AP1PlayerState>(Data.EffectSpec.GetEffectContext().GetInstigator());
+	UAbilitySystemComponent* InstigatorASC = InstigatorPS ? InstigatorPS->GetAbilitySystemComponent() : nullptr;
+	if (!InstigatorASC || !InstigatorASC->HasMatchingGameplayTag(TAG_Item_Ashbringer_ChronoStrike))
+	{
+		return; // 애쉬브링어 미보유 — 발동 안 함.
+	}
+
+	UP1AbilitySystemComponent* InstigatorP1ASC = Cast<UP1AbilitySystemComponent>(InstigatorASC);
+	if (!InstigatorP1ASC)
+	{
+		return;
+	}
+
+	// 대상(=이 AttributeSet의 소유자, 피해자)이 정글 몬스터면 4%, 영웅이면 8% — HandleKillRewards/
+	// HandleMonsterKillRewards와 동일한 판별 방식(ASC OwnerActor가 AP1PlayerState로 캐스트되면 영웅,
+	// 실패하면 몬스터 Pawn 자신 — 몬스터는 ASC를 PlayerState가 아니라 Pawn이 직접 호스팅하므로).
+	const bool bTargetIsMonster = Cast<AP1PlayerState>(GetOwningActor()) == nullptr;
+	const float Percent = bTargetIsMonster ? ChronoStrikeMonsterCDRPercent : ChronoStrikeHeroCDRPercent;
+
+	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_Q, Percent);
+	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_E, Percent);
+	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_RMB, Percent);
+}
+
 void UP1AttributeSet::HandleKillRewards(const FGameplayEffectModCallbackData& Data)
 {
 	constexpr float AssistWindowSeconds = 10.0f;
 
 	UAbilitySystemComponent* VictimASC = GetOwningAbilitySystemComponent();
-	AP1PlayerState* VictimPS = Cast<AP1PlayerState>(VictimASC ? VictimASC->GetOwnerActor() : nullptr);
+	AActor* VictimOwner = VictimASC ? VictimASC->GetOwnerActor() : nullptr;
+	AP1PlayerState* VictimPS = Cast<AP1PlayerState>(VictimOwner);
 	if (!VictimPS)
 	{
+		// 정글 몬스터는 ASC를 PlayerState가 아니라 Pawn 자신이 들고 있어 여기로 빠진다(팀 킬스코어/KDA는
+		// 원래도 안 섞여야 하는 게 맞지만, 골드/경험치까지 같이 누락되고 있었던 게 실제 버그였음).
+		HandleMonsterKillRewards(Data, VictimOwner);
 		return;
 	}
 
@@ -462,4 +503,29 @@ void UP1AttributeSet::HandleKillRewards(const FGameplayEffectModCallbackData& Da
 
 	// 다음 생애주기는 기여 기록 없이 새로 시작 — 방금 죽은 시점 이전 기록이 다음 죽음에 영향 주면 안 된다.
 	RecentDamageContributors.Empty();
+}
+
+void UP1AttributeSet::HandleMonsterKillRewards(const FGameplayEffectModCallbackData& Data, AActor* VictimOwner)
+{
+	AP1JungleMonsterCharacter* VictimMonster = Cast<AP1JungleMonsterCharacter>(VictimOwner);
+	if (!VictimMonster)
+	{
+		return;
+	}
+
+	// 정글 몬스터를 죽였을 때의 Instigator도 히어로 데미지와 동일한 컨벤션(ASC OwnerActor=AP1PlayerState)을 따른다.
+	AP1PlayerState* KillerPS = Cast<AP1PlayerState>(Data.EffectSpec.GetEffectContext().GetInstigator());
+	AP1HeroCharacter* KillerHero = KillerPS ? Cast<AP1HeroCharacter>(KillerPS->GetPawn()) : nullptr;
+	if (!KillerHero)
+	{
+		return;
+	}
+
+	int32 GoldAmount = 0;
+	float ExperienceAmount = 0.0f;
+	VictimMonster->GetKillReward(GoldAmount, ExperienceAmount);
+	KillerHero->GrantMonsterKillReward(GoldAmount, ExperienceAmount);
+
+	UE_LOG(LogP1, Log, TEXT("[AttributeSet][Kill] 정글 몬스터 처치 — %s → 킬러=%s (Gold=%d XP=%.0f)"),
+		*VictimMonster->GetName(), *KillerPS->GetName(), GoldAmount, ExperienceAmount);
 }

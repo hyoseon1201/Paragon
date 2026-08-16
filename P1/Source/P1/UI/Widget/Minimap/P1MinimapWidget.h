@@ -9,6 +9,7 @@
 class UImage;
 class UCanvasPanel;
 class UP1MinimapIconWidget;
+class UP1MinimapCampIconWidget;
 class AP1PlayerState;
 class AP1JungleCampAnchor;
 
@@ -16,12 +17,16 @@ class AP1JungleCampAnchor;
 // GetWorld()->GetGameState<AP1GameState>()를 타이머로 직접 폴링한다(계속 흐르는 스냅샷 UI라 델리게이트
 // 보다 폴링이 더 단순하고 정확히 맞는 패턴).
 //
-// 시야는 서버 권위 안티치트 시스템이 아니라 전부 클라이언트 로컬 계산이다 — 캐릭터 위치는 이미 표준
-// Character 무브먼트 리플리케이션으로 모든 클라이언트에 도달해 있으므로(3D 렌더링을 위해 애초에
-// 숨길 수 없음), "적이 아군 시야 안에 있는지"는 미니맵 표시 여부만 클라이언트에서 걸러내는 순수
-// 연출이다. 정글 캠프 생사도 AP1JungleCampAnchor(논리플리케이트, CurrentMonsters는 서버 전용)를
-// 직접 안 건드리고, 캠프 위치 근처에 살아있는 AP1JungleMonsterCharacter가 있는지를 클라이언트가
-// 직접 스캔해서 판단한다.
+// 플레이어 시야는 서버 권위 안티치트 시스템이 아니라 전부 클라이언트 로컬 계산이다 — 캐릭터 위치는
+// 이미 표준 Character 무브먼트 리플리케이션으로 모든 클라이언트에 도달해 있으므로(3D 렌더링을 위해
+// 애초에 숨길 수 없음), "적이 아군 시야 안에 있는지"는 미니맵 표시 여부만 클라이언트에서 걸러내는
+// 순수 연출이다.
+//
+// 정글 캠프는 다르다 — "팀이 직접 확인해야 죽음을 안다"는 진짜 정보 은닉(안개)이 필요해서, 실제
+// 생사 판정과 팀별 확인 여부를 AP1JungleCampAnchor가 서버 권위로 계산해 리플리케이트한다
+// (RespawnServerTime/TeamHasObservedDeath). 이 위젯은 그 값을 그대로 읽어 표시만 한다 — 미확인
+// 상태면 실제로 죽었어도 계속 "살아있음"으로 스테일 표시하고, 확인되면 카운트다운을 보여준다.
+// 부활만은 확인 여부와 무관하게 항상 즉시 반영된다.
 UCLASS()
 class P1_API UP1MinimapWidget : public UUserWidget
 {
@@ -39,9 +44,15 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UCanvasPanel> MinimapIconContainer;
 
-	// 플레이어 아이콘/캠프 아이콘 공용 클래스 — WBP_MinimapIcon(parent=UP1MinimapIconWidget) 지정.
+	// 플레이어 아이콘 클래스 — WBP_MinimapIcon(parent=UP1MinimapIconWidget, 초상화+원형 테두리) 지정.
 	UPROPERTY(EditDefaultsOnly, Category = "Minimap")
 	TSubclassOf<UP1MinimapIconWidget> IconWidgetClass;
+
+	// 정글 캠프 아이콘 클래스 — 초상화/카운트다운 등 플레이어 아이콘과 필요한 게 달라 완전히 별개
+	// C++ 클래스(UP1MinimapCampIconWidget)로 분리했다. WBP_MinimapCampIcon(parent=
+	// UP1MinimapCampIconWidget, 다이아몬드 마스크 머티리얼 + CountdownText 배치) 지정.
+	UPROPERTY(EditDefaultsOnly, Category = "Minimap")
+	TSubclassOf<UP1MinimapCampIconWidget> CampIconWidgetClass;
 
 	// 아레나 월드 X/Y 범위(cm) — 미니맵 배경 이미지의 좌상단/우하단에 대응하는 월드 좌표. 에디터에서
 	// 실측해서 지정해야 한다(배경 캡처 카메라가 정확히 수직/무회전이어야 이 매핑이 정확함).
@@ -54,11 +65,6 @@ protected:
 	// 아군 기준 이 반경(cm) 안에 있는 적만 미니맵에 표시.
 	UPROPERTY(EditDefaultsOnly, Category = "Minimap")
 	float VisionRadius = 1500.0f;
-
-	// 캠프 앵커 위치 기준 이 반경(cm) 안에 살아있는 몬스터가 있으면 그 캠프 아이콘을 표시.
-	// AP1JungleCampAnchor::PackSpawnRadius는 private이라 직접 못 읽으므로 미니맵 전용 근사치.
-	UPROPERTY(EditDefaultsOnly, Category = "Minimap")
-	float CampDetectionRadius = 500.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Minimap")
 	float RefreshIntervalSeconds = 0.2f;
@@ -82,11 +88,19 @@ private:
 	UPROPERTY()
 	TMap<TObjectPtr<AP1PlayerState>, TObjectPtr<UP1MinimapIconWidget>> PlayerIconPool;
 
-	// 캠프는 위치가 고정이라 NativeConstruct에서 한 번만 캐싱 — 인덱스가 CampIconPool과 대응.
-	TArray<FVector> CachedCampLocations;
+	// 캠프는 위치가 고정이라 NativeConstruct에서 한 번만 캐싱 — 인덱스가 CampIconPool과 대응. 위치뿐
+	// 아니라 앵커 자체를 들고 있어야 RespawnServerTime/TeamHasObservedDeath(팀 공유 안개 상태)를 매
+	// 리프레시마다 읽을 수 있다.
+	UPROPERTY()
+	TArray<TObjectPtr<AP1JungleCampAnchor>> CachedCampAnchors;
 
 	UPROPERTY()
-	TArray<TObjectPtr<UP1MinimapIconWidget>> CampIconPool;
+	TArray<TObjectPtr<UP1MinimapCampIconWidget>> CampIconPool;
+
+	// 캠프 위치는 매치 내내 고정이라 한 번만 계산하면 충분 — NativeConstruct 시점엔 컨테이너 지오메트리가
+	// 아직 유효하지 않을 수 있어(레이아웃 계산 전), RefreshMinimap()이 매 틱 컨테이너 크기가 유효해졌는지
+	// 확인하다가 처음 성공하는 순간 위치를 확정하고 이 플래그를 true로 잠근다(이후 틱은 재계산 스킵).
+	bool bCampIconsPositioned = false;
 
 	FTimerHandle RefreshTimerHandle;
 };

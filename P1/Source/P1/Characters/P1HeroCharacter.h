@@ -14,6 +14,7 @@ class UP1HeroComponent;
 class UMotionWarpingComponent;
 class UAnimMontage;
 class UCurveTable;
+class UTexture2D;
 class AP1PlayerState;
 struct FGameplayEventData;
 
@@ -39,6 +40,11 @@ public:
 	void GrantKillReward(int32 VictimKillStreak, float VictimTimeSinceLastDeath, int32 VictimLevel);
 	void GrantAssistReward(int32 VictimLevel);
 
+	// 정글 몬스터 처치 보상 — 챔피언 킬과 달리 현상금 MMC/피해자레벨 커브 조회가 필요 없다(몬스터 쪽
+	// AP1JungleMonsterCharacter::GetKillReward()가 이미 최종 골드/경험치를 계산해서 넘겨준다). 어시스트와
+	// 동일한 "플랫 지급" 경로(GoldRewardFlatEffectClass/ExperienceRewardEffectClass)를 그대로 재사용.
+	void GrantMonsterKillReward(int32 GoldAmount, float ExperienceAmount);
+
 	// UP1AttributeSet이 Experience 증가로 레벨업 임계치를 넘었는지 감지하면 호출 — 임계치를 넘는 동안
 	// (한 번에 여러 레벨 상승 가능) 반복해서 레벨을 올리고, 매 레벨마다 ApplyBaseStatsForLevel(bFullHeal=false)로
 	// 최대치 증가분만큼만 현재 체력/마나를 함께 늘린다(레벨업이 공짜 완전회복이 되면 안 되므로).
@@ -48,10 +54,20 @@ public:
 	// 이름을 그대로 노출한다(별도 축약형을 따로 관리하지 않음).
 	FText GetHeroDisplayName() const { return HeroDisplayName; }
 
+	// 미니맵 아이콘 등 원형 초상화가 필요한 UI에서 사용. 영웅 BP의 클래스 디폴트라 리플리케이션이
+	// 필요 없다 — 원격 클라이언트도 스폰된 Pawn의 실제 클래스(=어떤 영웅인지)는 이미 표준 액터 클래스
+	// 리플리케이션으로 알고 있으므로, GetClass()->GetDefaultObject<AP1HeroCharacter>()로 CDO의
+	// 초상화를 그냥 읽으면 된다.
+	UTexture2D* GetHeroPortrait() const { return HeroPortrait; }
+
 protected:
 	// 머리 위 FloatingStatus 위젯에 표시할 영웅 이름(예: "Greystone"). 영웅 BP마다 설정.
 	UPROPERTY(EditDefaultsOnly, Category = "Character")
 	FText HeroDisplayName;
+
+	// 미니맵 등에서 쓸 원형 초상화 텍스처. 영웅 BP마다 설정.
+	UPROPERTY(EditDefaultsOnly, Category = "Character")
+	TObjectPtr<UTexture2D> HeroPortrait;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Abilities")
 	TSubclassOf<UGameplayEffect> DefaultAttributesEffect;

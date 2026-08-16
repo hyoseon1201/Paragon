@@ -204,9 +204,28 @@ private:
 	// ("내가 입힌 데미지만 나에게 보인다" — LoL/Dota 컨벤션). 데미지가 실제로 적용된 경우에만 호출.
 	void NotifyDamageDealt(const FGameplayEffectModCallbackData& Data, float DamageAmount);
 
+	// 애쉬브링어(아이템) 고유효과 "크로노 스트라이크" — 가해자가 Item.Ashbringer.ChronoStrike 루즈
+	// 태그를 갖고 있고 이 데미지가 기본 공격에서 왔으면, 가해자의 Q/E/RMB 쿨다운을 대상 유형(영웅/
+	// 정글 몬스터)에 따라 다른 비율로 감소시킨다(UP1AbilitySystemComponent::ReduceCooldownByInputTag로 위임).
+	// 데미지가 실제로 적용된 경우에만 호출(무적/디플렉트로 무효화된 히트는 발동 안 함).
+	void HandleChronoStrikeProc(const FGameplayEffectModCallbackData& Data);
+
+	// 애쉬브링어 크로노 스트라이크의 대상별 쿨다운 감소율 — 이 아이템 하나에만 쓰이는 고정값이라
+	// (다른 온-히트 CDR 아이템이 생기기 전까진) 범용 데이터 구조로 뽑지 않고 EditDefaultsOnly로만 노출.
+	UPROPERTY(EditDefaultsOnly, Category = "Items|Ashbringer")
+	float ChronoStrikeHeroCDRPercent = 0.08f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Items|Ashbringer")
+	float ChronoStrikeMonsterCDRPercent = 0.04f;
+
 	// 사망 확정 시 호출 — 킬러 판별, 최근 10초 내 딜 넣은 플레이어 전원에게 어시스트 지급,
 	// Kills/Deaths/Assists/KillStreak 갱신 후 골드+경험치 보상 GE를 킬러/어시스터 각자에게 적용한다.
+	// 피해자가 AP1PlayerState를 못 가진 경우(=정글 몬스터)는 HandleMonsterKillRewards로 위임한다.
 	void HandleKillRewards(const FGameplayEffectModCallbackData& Data);
+
+	// 정글 몬스터 처치 보상 — Kills/Deaths/KillStreak/어시스트 등 플레이어간 KDA 집계는 전혀 관여하지
+	// 않고, 킬러에게 몬스터가 계산한 골드/경험치만 그대로 지급한다(AP1JungleMonsterCharacter::GetKillReward 참고).
+	void HandleMonsterKillRewards(const FGameplayEffectModCallbackData& Data, AActor* VictimOwner);
 };
 
 #undef ATTRIBUTE_ACCESSORS

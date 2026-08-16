@@ -141,7 +141,10 @@ public:
 	void ServerSellItem(FName ItemRowName);
 
 protected:
-	UPROPERTY()
+	// VisibleAnywhere — BP_P1PlayerState의 Components 패널에 노출해 GenericCooldownReductionEffectClass
+	// 같은 이 컴포넌트의 EditDefaultsOnly 프로퍼티를 에디터에서 지정할 수 있게 한다(FloatingStatusComponent와
+	// 동일한 컨벤션). 이게 빠져있으면 컴포넌트 자체가 BP 에디터의 Components 트리에 안 나타난다.
+	UPROPERTY(VisibleAnywhere, Category = "Abilities")
 	TObjectPtr<UP1AbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY()

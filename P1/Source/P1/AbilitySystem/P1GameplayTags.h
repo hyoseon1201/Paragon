@@ -187,3 +187,10 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_IonStrike)
 // AIController가 BT 태스크에서 이 이벤트로 근접 공격 어빌리티를 트리거한다 — 실제 조준/판정은
 // 어빌리티가 UP1DamageGameplayAbility::GetEnemiesInRadius로 직접 재조회(EventData에 타겟을 안 실음).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Monster_MeleeAttack)
+
+// --- 아이템: 애쉬브링어(고유효과 "크로노 스트라이크" — 기본 공격 적중 시 Q/E/RMB 쿨다운 감소) ---
+// 아이템 구매 시 적용되는 Infinite GE가 부여하는 존재 확인용 루즈 태그 — Ability.StoicismDeflect와
+// 동일한 패턴(AttributeSet이 아이템 자체를 몰라도 이 태그 유무만으로 "이 캐릭터가 애쉬브링어를
+// 보유 중인지" 판별). 실제 발동(기본 공격 적중 감지→쿨다운 감소)은 UP1AttributeSet::
+// PostGameplayEffectExecute에서 처리하고, 감소는 범용 UP1AbilitySystemComponent::ReduceCooldownByInputTag로 위임.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Item_Ashbringer_ChronoStrike)

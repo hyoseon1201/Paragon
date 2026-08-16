@@ -1,12 +1,14 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/P1JungleMonsterCharacter.h"
+#include "Characters/P1JungleMonsterTypes.h"
 #include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AI/P1JungleCampAnchor.h"
 #include "AI/P1JungleMonsterAIController.h"
 #include "Player/P1PlayerState.h"
+#include "Engine/CurveTable.h"
 #include "UI/P1FloatingWidgetComponent.h"
 #include "UI/Widget/HUD/P1FloatingStatusWidget.h"
 #include "UI/WidgetController/P1FloatingStatusWidgetController.h"
@@ -183,6 +185,44 @@ void AP1JungleMonsterCharacter::ExitLeashRecovery()
 	}
 
 	bIsLeashRecovering = false;
+}
+
+void AP1JungleMonsterCharacter::SetOwningCampAnchor(AP1JungleCampAnchor* Anchor)
+{
+	OwningCampAnchor = Anchor;
+}
+
+void AP1JungleMonsterCharacter::GetKillReward(int32& OutGold, float& OutExperience) const
+{
+	OutGold = 0;
+	OutExperience = 0.0f;
+
+	if (!RewardDataTable)
+	{
+		return;
+	}
+
+	static const FString ContextString(TEXT("AP1JungleMonsterCharacter::GetKillReward"));
+	const FP1MonsterRewardData* Row = RewardDataTable->FindRow<FP1MonsterRewardData>(MonsterTypeName, ContextString, false);
+	if (!Row)
+	{
+		UE_LOG(LogP1, Warning, TEXT("[JungleMonster] GetKillReward — RewardDataTable에 '%s' Row가 없습니다 (%s)"),
+			*MonsterTypeName.ToString(), *GetName());
+		return;
+	}
+
+	float Multiplier = 1.0f;
+	if (RewardMultiplierTable)
+	{
+		static const FName MultiplierRowName(TEXT("MonsterRewardMultiplier"));
+		if (const FRealCurve* Curve = RewardMultiplierTable->FindCurve(MultiplierRowName, ContextString))
+		{
+			Multiplier = Curve->Eval(static_cast<float>(MonsterLevel));
+		}
+	}
+
+	OutGold = FMath::RoundToInt(Row->BaseGold * Multiplier);
+	OutExperience = Row->BaseExperience * Multiplier;
 }
 
 void AP1JungleMonsterCharacter::RequestMeleeAttack()

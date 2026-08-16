@@ -13,6 +13,8 @@ class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
 class AP1JungleCampAnchor;
+class UCurveTable;
+class UDataTable;
 struct FGameplayEventData;
 
 // 정글 몬스터(중립 캠프) — ASC/AttributeSet을 PlayerState가 아니라 Pawn 자신이 직접 들고 있다
@@ -77,7 +79,15 @@ public:
 
 	// AP1JungleCampAnchor가 스폰 직후 자신을 등록 — 맞았을 때(OnHitReactEventReceived) 같은 캠프의
 	// 나머지 무리에게도 어그로를 전파할 수 있게 역참조를 들고 있는다(단일 몬스터 캠프면 그냥 무시됨).
-	void SetOwningCampAnchor(AP1JungleCampAnchor* Anchor) { OwningCampAnchor = Anchor; }
+	// .cpp에서 정의(헤더에 인라인으로 두면 AP1JungleCampAnchor가 전방 선언뿐이라 TWeakObjectPtr 대입에
+	// 필요한 전체 타입 정보가 없어 컴파일 에러 — 유니티 빌드에선 다른 파일이 우연히 전체 정의를 먼저
+	// 끌어와서 가려져 있다가, 이 헤더만 단독 컴파일되는 상황에서 드러난 적이 있다).
+	void SetOwningCampAnchor(AP1JungleCampAnchor* Anchor);
+
+	// 처치 보상 계산 — UP1AttributeSet::HandleKillRewards()가 Health<=0 감지 시점에 호출한다.
+	// RewardDataTable/MonsterTypeName 중 하나라도 비어있거나 해당 Row를 못 찾으면 0/0을 반환(조용한
+	// 폴백 — 보상 데이터 미설정 몬스터도 빌드/플레이가 깨지지 않게).
+	void GetKillReward(int32& OutGold, float& OutExperience) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -136,6 +146,20 @@ protected:
 	// 근접 공격 어빌리티 — BeginPlay에 GiveAbility, RequestMeleeAttack()이 이벤트로 트리거한다.
 	UPROPERTY(EditDefaultsOnly, Category = "JungleMonster")
 	TSubclassOf<UGameplayAbility> MeleeAttackAbilityClass;
+
+	// Data/DT_MonsterGoldXP.json에서 임포트한 DataTable(Row Struct=FP1MonsterRewardData) — 이 몬스터의
+	// 처치 보상(1레벨 기준 BaseGold/BaseExperience)을 MonsterTypeName 행에서 조회한다.
+	UPROPERTY(EditDefaultsOnly, Category = "JungleMonster|Reward")
+	TObjectPtr<UDataTable> RewardDataTable;
+
+	// RewardDataTable에서 조회할 Row 이름(예: "Wolves", "Raptors") — DT_MonsterGoldXP.json의 "Name" 값과 일치해야 함.
+	UPROPERTY(EditDefaultsOnly, Category = "JungleMonster|Reward")
+	FName MonsterTypeName;
+
+	// Data/CT_MonsterRewardMultiplier.json에서 임포트(Row="MonsterRewardMultiplier", Time=MonsterLevel) —
+	// BaseGold/BaseExperience에 곱할 레벨 배율. 미설정 시 배율 1.0 고정(스케일링 없이 기본값 그대로 지급).
+	UPROPERTY(EditDefaultsOnly, Category = "JungleMonster|Reward")
+	TObjectPtr<UCurveTable> RewardMultiplierTable;
 
 private:
 	void ApplyDefaultAttributes();

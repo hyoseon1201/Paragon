@@ -29,7 +29,13 @@ EBTNodeResult::Type UBTTask_P1ReturnToCamp::ExecuteTask(UBehaviorTreeComponent& 
 	ElapsedSeconds = 0.0f;
 
 	const FVector Home = Monster->GetHomeLocation();
-	const EPathFollowingRequestResult::Type MoveResult = AICon->MoveToLocation(Home, AcceptanceRadius);
+	// bStopOnOverlap=false — 기본값(true)이면 AIController가 "캡슐이 목표 지점과 겹치면 도착"으로
+	// 판정해 실제로는 AcceptanceRadius+캡슐반경만큼 떨어진 채로 이동을 멈춰버린다(예: AcceptRadius=100,
+	// 캡슐반경=38이면 138 거리에서 멈춤). 그런데 TickTask의 도착 판정은 순수 점대점 거리로 AcceptanceRadius만
+	// 비교하므로 이 상태에선 영원히 "도착"으로 안 잡히고 MaxReturnDuration 강제 포기까지 무적이 풀리지
+	// 않는 버그가 있었다 — bStopOnOverlap=false로 캡슐 여유 없이 실제로 AcceptanceRadius 안까지 걸어오게
+	// 강제해 두 판정 기준을 일치시킨다.
+	const EPathFollowingRequestResult::Type MoveResult = AICon->MoveToLocation(Home, AcceptanceRadius, false);
 
 	UE_LOG(LogP1, Log, TEXT("[JungleMonsterAI] ReturnToCamp 시작 — Home=%s AcceptRadius=%.0f 현재거리=%.0f MoveToResult=%d (%s)"),
 		*Home.ToCompactString(), AcceptanceRadius,
@@ -67,6 +73,7 @@ void UBTTask_P1ReturnToCamp::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* 
 
 	if (FVector::Dist(Monster->GetActorLocation(), Monster->GetHomeLocation()) <= AcceptanceRadius)
 	{
+		UE_LOG(LogP1, Log, TEXT("[JungleMonsterAI] ReturnToCamp 도착 감지 — 거리기준 정상 완료 (%s)"), *Monster->GetName());
 		FinishReturnHome(OwnerComp, Monster);
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
@@ -93,5 +100,13 @@ void UBTTask_P1ReturnToCamp::FinishReturnHome(UBehaviorTreeComponent& OwnerComp,
 	if (UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent())
 	{
 		BB->SetValueAsBool(AP1JungleMonsterAIController::BBKey_IsLeashing, false);
+
+		// SetValueAsBool은 옵저버(Reset 브랜치의 IsLeashing==true 데코레이터)를 동기적으로 즉시 통지할 수
+		// 있다 — 그 데코레이터가 Observer Aborts=Self로 설정돼 있으면 이 호출 도중에 트리가 이미 이
+		// 태스크를 어보트시키기 시작했을 수 있고, 뒤이은 FinishLatentTask(Succeeded) 호출과 경합해서
+		// "정리는 됐는데 트리가 다음 브랜치로 안 넘어가는" 상태로 굳는 경우가 있다 — 실제로 값이 반영됐는지
+		// 여기서 즉시 읽어봐서 확인한다.
+		UE_LOG(LogP1, Log, TEXT("[JungleMonsterAI] FinishReturnHome — IsLeashing=false 기록, 읽어보면=%d (%s)"),
+			BB->GetValueAsBool(AP1JungleMonsterAIController::BBKey_IsLeashing) ? 1 : 0, *Monster->GetName());
 	}
 }

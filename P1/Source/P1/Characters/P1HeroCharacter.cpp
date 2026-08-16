@@ -694,6 +694,19 @@ void AP1HeroCharacter::GrantAssistReward(int32 VictimLevel)
 	UE_LOG(LogP1, Log, TEXT("[Reward] GrantAssistReward — %s (피해자 레벨=%d XP=%.0f)"), *GetName(), VictimLevel, AssistExperienceAmount);
 }
 
+void AP1HeroCharacter::GrantMonsterKillReward(int32 GoldAmount, float ExperienceAmount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	ApplyFlatRestoreEffect(GoldRewardFlatEffectClass, TAG_Data_Gold_Flat, static_cast<float>(GoldAmount));
+	ApplyFlatRestoreEffect(ExperienceRewardEffectClass, TAG_Data_Experience_Flat, ExperienceAmount);
+
+	UE_LOG(LogP1, Log, TEXT("[Reward] GrantMonsterKillReward — %s (Gold=%d XP=%.0f)"), *GetName(), GoldAmount, ExperienceAmount);
+}
+
 void AP1HeroCharacter::CheckLevelUp()
 {
 	if (!HasAuthority())

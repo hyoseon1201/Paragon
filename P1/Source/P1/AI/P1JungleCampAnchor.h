@@ -66,10 +66,32 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Camp")
 	TObjectPtr<UCurveTable> MonsterLevelByMatchTimeTable;
 
+	// 팀이 이 캠프 근처에서 살아있는 아군 Pawn으로 직접 확인해야 "죽음"을 알 수 있는 반경(cm) — 미니맵
+	// 안개 시스템 전용. 부활은 확인 여부와 무관하게 항상 즉시 반영된다(아래 RespawnServerTime 참고).
+	UPROPERTY(EditAnywhere, Category = "Camp|Minimap", meta = (ClampMin = "0.0"))
+	float VisionCheckRadius = 1500.0f;
+
 public:
 	// 무리 중 한 마리가 맞았을 때(AP1JungleMonsterCharacter::OnHitReactEventReceived) 호출 — 나머지
 	// 생존 개체 전원(SourceMonster 본인 제외)에게도 같은 공격자를 타겟으로 어그로를 전파한다.
 	void NotifyCampAggro(AActor* Attacker, AP1JungleMonsterCharacter* SourceMonster);
+
+	// 미니맵 안개 시스템 전용 접근자 — RepNotify 없이 순수 폴링(UP1MinimapWidget이 0.2초마다 직접
+	// 읽음, AP1GameState::MatchStartServerTime과 동일한 이유로 이벤트 델리게이트가 필요 없다).
+	// -1.0 = 캠프가 살아있음(리스폰 대기 없음). 무리 전체가 죽는 순간 서버 시각+RespawnDelay로 찍히고,
+	// 재스폰되는 순간 다시 -1.0으로 — "부활은 확인 여부와 무관하게 즉시 반영"이 이 리셋 하나로 자연히
+	// 성립한다(클라이언트 표시 로직이 항상 "미확인=살아있음으로 표시"를 기본값으로 삼기 때문).
+	float GetRespawnServerTime() const { return RespawnServerTime; }
+
+	// TeamId가 "이번 죽음 사이클"을 직접 확인했는지 — 팀 전체가 공유하는 기억(한 명이 확인하면 팀
+	// 전원의 미니맵에 즉시 반영). 무리 전체가 재스폰되는 순간 전 팀이 다시 false로 초기화된다.
+	bool HasTeamObservedDeath(int32 TeamId) const
+	{
+		return TeamHasObservedDeath.IsValidIndex(TeamId) && TeamHasObservedDeath[TeamId];
+	}
+
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
 	// 무리 전체(MonsterCount마리)를 스폰 — RespawnTimerHandle이 만료되면 이 함수가 다시 불려 무리
@@ -85,9 +107,22 @@ private:
 	// 현재 매치 경과 시간을 MonsterLevelByMatchTimeTable에 대입해 몬스터 레벨을 계산(1 미만으로는 안 내려감).
 	int32 ComputeMonsterLevel() const;
 
+	// VisionCheckTimerHandle이 무리 전체가 죽어있는 동안 반복 호출 — 팀별로 아직 미확인 상태면 그 팀의
+	// 살아있는 아군 Pawn이 VisionCheckRadius 안에 있는지 검사해 TeamHasObservedDeath를 래치한다.
+	// 전 팀이 확인을 마치면 스스로 타이머를 멈춘다(더 이상 검사할 게 없으므로).
+	void CheckTeamVisionOfDeadCamp();
+
 	FTimerHandle RespawnTimerHandle;
+	FTimerHandle VisionCheckTimerHandle;
 
 	// 현재 살아있는 무리 구성원 전체 — 죽으면 OnMonsterDied가 제거하고, 비면 리스폰 타이머가 돈다.
 	UPROPERTY()
 	TArray<TObjectPtr<AP1JungleMonsterCharacter>> CurrentMonsters;
+
+	UPROPERTY(Replicated)
+	float RespawnServerTime = -1.0f;
+
+	// 인덱스=TeamId. AP1GameState::InitializeTeamScores()가 이미 정한 팀 수로 무리 전멸 시점에 맞춤.
+	UPROPERTY(Replicated)
+	TArray<bool> TeamHasObservedDeath;
 };

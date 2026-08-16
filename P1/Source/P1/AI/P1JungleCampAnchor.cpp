@@ -6,6 +6,11 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/CurveTable.h"
 #include "GameModes/P1GameState.h"
+#include "Player/P1PlayerState.h"
+#include "AbilitySystem/P1GameplayTags.h"
+#include "AbilitySystemComponent.h"
+#include "GameFramework/Pawn.h"
+#include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
 #include "P1.h"
 
@@ -15,6 +20,19 @@ AP1JungleCampAnchor::AP1JungleCampAnchor()
 	SetRootComponent(MarkerMeshComponent);
 	MarkerMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MarkerMeshComponent->SetCastShadow(false);
+
+	// 미니맵 안개 시스템(RespawnServerTime/TeamHasObservedDeath)이 리플리케이트되는 프로퍼티라 필요 —
+	// 레벨 배치 액터라 기존엔 리플리케이션이 전혀 필요 없었지만(CurrentMonsters는 여전히 서버 전용),
+	// 이 두 값만은 클라이언트가 직접 읽어야 하는 최초의 예외.
+	bReplicates = true;
+}
+
+void AP1JungleCampAnchor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AP1JungleCampAnchor, RespawnServerTime);
+	DOREPLIFETIME(AP1JungleCampAnchor, TeamHasObservedDeath);
 }
 
 void AP1JungleCampAnchor::BeginPlay()
@@ -62,6 +80,11 @@ FVector AP1JungleCampAnchor::ComputeSpawnOffset(int32 Index) const
 
 void AP1JungleCampAnchor::SpawnMonster()
 {
+	// 리스폰 시점 — 미확인 상태였던 팀도 포함해 전원에게 즉시 "살아있음"으로 반영된다(안개 시스템의
+	// 핵심 요구사항: 죽음은 직접 확인해야 알지만, 부활은 확인 여부와 무관하게 즉시 알려진다).
+	RespawnServerTime = -1.0f;
+	GetWorldTimerManager().ClearTimer(VisionCheckTimerHandle);
+
 	if (!MonsterClass)
 	{
 		UE_LOG(LogP1, Warning, TEXT("[JungleCampAnchor] MonsterClass가 설정되지 않았습니다 (%s) — 스폰 스킵"), *GetName());
@@ -140,5 +163,58 @@ void AP1JungleCampAnchor::OnMonsterDied(AP1JungleMonsterCharacter* DeadMonster)
 	if (CurrentMonsters.Num() == 0)
 	{
 		GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &AP1JungleCampAnchor::SpawnMonster, RespawnDelay, false);
+
+		// 미니맵 안개 시스템 — 이번 죽음 사이클을 아직 아무 팀도 확인 못 한 상태로 시작하고, 팀별
+		// 확인 여부를 주기적으로 검사하는 타이머를 돌린다(AP1GameState::GetElapsedMatchTime()과 동일하게
+		// GetWorld()->GetTimeSeconds() 기준 — 서버 자신에게는 이 값이 곧 GetServerWorldTimeSeconds()와
+		// 같으므로 클라이언트가 나중에 그 값으로 역산해도 어긋나지 않는다, StunEndServerTime과 동일한 패턴).
+		const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
+		TeamHasObservedDeath.Init(false, P1GS ? P1GS->GetNumTeams() : 0);
+		RespawnServerTime = GetWorld()->GetTimeSeconds() + RespawnDelay;
+
+		GetWorldTimerManager().SetTimer(VisionCheckTimerHandle, this, &AP1JungleCampAnchor::CheckTeamVisionOfDeadCamp, 0.5f, true);
+	}
+}
+
+void AP1JungleCampAnchor::CheckTeamVisionOfDeadCamp()
+{
+	const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
+	if (!P1GS)
+	{
+		return;
+	}
+
+	const float VisionCheckRadiusSq = FMath::Square(VisionCheckRadius);
+	for (APlayerState* PS : P1GS->PlayerArray)
+	{
+		AP1PlayerState* P1PS = Cast<AP1PlayerState>(PS);
+		APawn* AllyPawn = P1PS ? P1PS->GetPawn() : nullptr;
+		if (!P1PS || !AllyPawn)
+		{
+			continue;
+		}
+
+		const int32 TeamId = P1PS->GetGenericTeamId().GetId();
+		if (!TeamHasObservedDeath.IsValidIndex(TeamId) || TeamHasObservedDeath[TeamId])
+		{
+			continue; // 이미 확인했거나 팀 범위 밖 — 검사할 필요 없음.
+		}
+
+		const UAbilitySystemComponent* ASC = P1PS->GetAbilitySystemComponent();
+		if (ASC && ASC->HasMatchingGameplayTag(TAG_State_Dead))
+		{
+			continue; // 죽어있는 아군은 시야를 제공하지 않는다 — 미니맵 아군 시야 규칙과 동일.
+		}
+
+		if (FVector::DistSquared(AllyPawn->GetActorLocation(), GetActorLocation()) <= VisionCheckRadiusSq)
+		{
+			TeamHasObservedDeath[TeamId] = true;
+		}
+	}
+
+	const bool bAllTeamsObserved = !TeamHasObservedDeath.Contains(false);
+	if (bAllTeamsObserved)
+	{
+		GetWorldTimerManager().ClearTimer(VisionCheckTimerHandle); // 더 확인할 팀이 없으면 스스로 정지.
 	}
 }

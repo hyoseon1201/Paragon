@@ -91,3 +91,4 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_IonStrike, "Ability.IonStrike", "Ion 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_IonStrike, "Cooldown.Ability.IonStrike", "Ion Strike 쿨다운 GE가 부여하는 태그")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Monster_MeleeAttack, "Event.Monster.MeleeAttack", "정글 몬스터 AIController의 BT 태스크가 근접 공격 어빌리티를 트리거하는 이벤트")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Item_Ashbringer_ChronoStrike, "Item.Ashbringer.ChronoStrike", "애쉬브링어 보유 확인용 루즈 태그 — 기본 공격 적중 시 Q/E/RMB 쿨다운 감소(크로노 스트라이크) 발동 조건")

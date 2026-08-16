@@ -52,6 +52,10 @@ public:
 		return TeamKillScores.IsValidIndex(TeamId) ? TeamKillScores[TeamId] : 0;
 	}
 
+	// InitializeTeamScores()로 이미 정해진 팀 수를 그대로 재사용 — AP1JungleCampAnchor의 팀별 안개
+	// 상태 배열 크기를 정할 때 별도 GameMode 참조 없이 여기서 바로 얻는다.
+	int32 GetNumTeams() const { return TeamKillScores.Num(); }
+
 	EP1MatchState GetMatchState() const { return MatchState; }
 	int32 GetWinningTeamId() const { return WinningTeamId; }
 

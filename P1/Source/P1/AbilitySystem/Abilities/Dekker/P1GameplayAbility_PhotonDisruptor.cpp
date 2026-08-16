@@ -116,8 +116,12 @@ void UP1GameplayAbility_PhotonDisruptor::OnTargetDataReady(const FGameplayAbilit
 				SourceCharacter->MulticastPlayMovingParticleEffect(SkyDronePodEffect, SkyStart, SkyEnd, SweepDuration);
 			}
 
+			// InFirstDelay=0.0f — 기본값(생략 시 InRate와 동일)이면 첫 판정이 BlastTickInterval만큼 밀려서
+			// 실행되는 시점엔 이미 Alpha>0(캐릭터 위치를 지나 경로 중간)이 돼버린다(실전 로그로 확인된 버그 —
+			// Tick 1부터 Alpha=0.23이었음). 0으로 명시해 첫 블래스트가 캐릭터 위치(Alpha=0)에서 즉시
+			// 터지고, 이후 틱부터는 그대로 BlastTickInterval 간격을 유지한다.
 			GetWorld()->GetTimerManager().SetTimer(BlastTimerHandle, this,
-				&UP1GameplayAbility_PhotonDisruptor::OnBlastTick, BlastTickInterval, true);
+				&UP1GameplayAbility_PhotonDisruptor::OnBlastTick, BlastTickInterval, true, 0.0f);
 
 			UE_LOG(LogP1, Log, TEXT("[PhotonDisruptor] 발동 — Start=%s End=%s SweepDuration=%.2f초 %.1f초 간격"),
 				*GroundStart.ToString(), *GroundEnd.ToString(), SweepDuration, BlastTickInterval);
