@@ -100,6 +100,16 @@ protected:
 	// 사망 몽타주 재생 후, DeathDestroyDelay만큼 뒤에 액터를 파괴한다(DeathMontage 미설정 시 즉시 파괴).
 	void OnDiedEventReceived(const FGameplayEventData* Payload);
 
+	// State.Stunned 태그 카운트 변경 — 히어로는 AP1PlayerController::HandleMove()가 입력 단계에서
+	// 이동을 막지만, 이 캐릭터는 BT로 움직여서 그 경로를 아예 안 거친다(AIController/PathFollowing이
+	// 직접 이동을 처리) — 그래서 스턴을 맞아도 계속 걸어오는 버그가 있었다. 0→양수 전이 시
+	// AIController::StopMovement()로 현재 이동을 즉시 멈추고 BrainComponent::PauseLogic()으로 BT
+	// 틱 자체를 정지(사망 처리와 동일한 정지 방식, 다만 재개 가능), 양수→0 전이 시 ResumeLogic()으로
+	// 재개(TargetActor 블랙보드 키가 그대로 남아있으면 Combat 브랜치가 자연스럽게 이어짐). 공격(어빌리티
+	// 발동) 자체는 이미 베이스 UP1GameplayAbility의 ActivationBlockedTags(State.Stunned)로 막혀있으므로
+	// 이동만 신경 쓰면 된다.
+	void OnStunTagChanged(FGameplayTag Tag, int32 NewCount);
+
 	// 서버에서 호출 — 전 클라이언트의 로컬 AnimInstance에서 DeathMontage를 재생한다. 이 캐릭터는
 	// NetExecutionPolicy=ServerOnly인 어빌리티만 쓰고 소유 클라이언트도 없어서(AI 컨트롤러 소유),
 	// raw Montage_Play로는 서버 화면에만 보이므로 코스메틱 Multicast가 필요하다(AP1CharacterBase의

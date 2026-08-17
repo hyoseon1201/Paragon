@@ -12,6 +12,7 @@ struct FP1DamageStatics
 	DECLARE_ATTRIBUTE_CAPTUREDEF(MagicalPower);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(PhysicalPenetration);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(PhysicalArmor);
+	DECLARE_ATTRIBUTE_CAPTUREDEF(DamageReduction);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(MaxHealth);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(CriticalChance);
 	DECLARE_ATTRIBUTE_CAPTUREDEF(CriticalDamage);
@@ -28,6 +29,7 @@ struct FP1DamageStatics
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, MagicalPower, Source, true);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, PhysicalPenetration, Source, true);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, PhysicalArmor, Target, false);
+		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, DamageReduction, Target, false);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, MaxHealth, Target, false);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, CriticalChance, Source, true);
 		DEFINE_ATTRIBUTE_CAPTUREDEF(UP1AttributeSet, CriticalDamage, Source, true);
@@ -49,6 +51,7 @@ UP1ExecCalc_Damage::UP1ExecCalc_Damage()
 	RelevantAttributesToCapture.Add(DamageStatics().MagicalPowerDef);
 	RelevantAttributesToCapture.Add(DamageStatics().PhysicalPenetrationDef);
 	RelevantAttributesToCapture.Add(DamageStatics().PhysicalArmorDef);
+	RelevantAttributesToCapture.Add(DamageStatics().DamageReductionDef);
 	RelevantAttributesToCapture.Add(DamageStatics().MaxHealthDef);
 	RelevantAttributesToCapture.Add(DamageStatics().SourceMaxHealthDef);
 	RelevantAttributesToCapture.Add(DamageStatics().CriticalChanceDef);
@@ -76,6 +79,10 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 	float Armor = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().PhysicalArmorDef, EvalParams, Armor);
 	Armor = FMath::Max(0.0f, Armor);
+
+	float DamageReduction = 0.0f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().DamageReductionDef, EvalParams, DamageReduction);
+	DamageReduction = FMath::Clamp(DamageReduction, 0.0f, 1.0f);
 
 	float TargetMaxHealth = 0.0f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().MaxHealthDef, EvalParams, TargetMaxHealth);
@@ -111,18 +118,30 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 
 	const float PreMitigation = Raw * Multiplier * CriticalMultiplier;
 
+	// 고정 피해(Data.DamageType.True)면 방어력 감산 자체를 건너뛴다 — 관통(Penetration)으로 무효화되는
+	// 게 아니라 애초에 방어력 계산이 없는 별개 축이라 PassThrough=1.0으로 취급(DamageReduction은 그대로 적용됨).
+	const bool bIsTrueDamage = EvalParams.SourceTags && EvalParams.SourceTags->HasTag(TAG_Data_DamageType_True);
+
 	// 관통은 방어력을 flat 차감. 이후 방어 감산 공식 적용.
 	const float EffectiveArmor = FMath::Max(0.0f, Armor - Penetration);
 	constexpr float ArmorConstant = 100.0f;
-	const float PassThrough = ArmorConstant / (EffectiveArmor + ArmorConstant);
+	const float PassThrough = bIsTrueDamage ? 1.0f : (ArmorConstant / (EffectiveArmor + ArmorConstant));
 
-	const float FinalDamage = FMath::Max(0.0f, PreMitigation * PassThrough);
+	// DamageReduction은 방어력 감산 이후의 최종 승산 레이어 — 관통(Penetration)으로 무효화되지 않는다
+	// (방어력과는 별개 축이라는 게 이 스탯의 존재 이유, 사면(아이템) "용기" 참고).
+	const float FinalDamage = FMath::Max(0.0f, PreMitigation * PassThrough * (1.0f - DamageReduction));
 
-	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Crit=%d(%.0f%% 확률, %.2fx) | Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f → Final=%.1f"),
+	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Crit=%d(%.0f%% 확률, %.2fx) | True=%d Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f DamageReduction=%.2f → Final=%.1f"),
 		FlatDamage, PhysicalPowerCoeff, Power, MagicalPowerCoeff, MagicalPower, TargetMaxHealthPctCoeff, TargetMaxHealth,
 		SourceMaxHealthPctCoeff, SourceMaxHealth, Multiplier, Raw, bIsCriticalHit, CriticalChance * 100.0f, CriticalMultiplier,
-		Armor, Penetration, EffectiveArmor, PassThrough, FinalDamage);
+		bIsTrueDamage, Armor, Penetration, EffectiveArmor, PassThrough, DamageReduction, FinalDamage);
 
 	OutExecutionOutput.AddOutputModifier(
 		FGameplayModifierEvaluatedData(UP1AttributeSet::GetDamageAttribute(), EGameplayModOp::Additive, FinalDamage));
+
+	// 크리티컬 판정 결과를 메타 어트리뷰트로 함께 출력(Override — 누적이 아니라 이번 히트의 값 그대로) —
+	// PostGameplayEffectExecute가 Damage와 같은 타이밍에 읽고 즉시 0으로 리셋한다. 온-히트 크리티컬
+	// 반응 아이템(더스트 데빌의 "매너스" 등)이 이 값을 필요로 한다.
+	OutExecutionOutput.AddOutputModifier(
+		FGameplayModifierEvaluatedData(UP1AttributeSet::GetCriticalHitFlagAttribute(), EGameplayModOp::Override, bIsCriticalHit ? 1.0f : 0.0f));
 }

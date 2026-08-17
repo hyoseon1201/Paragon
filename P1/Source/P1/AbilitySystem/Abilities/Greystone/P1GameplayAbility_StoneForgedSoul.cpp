@@ -208,9 +208,14 @@ void UP1GameplayAbility_StoneForgedSoul::OnCrashEventReceived(FGameplayEventData
 
 	UE_LOG(LogP1, Log, TEXT("[StoneForgedSoul] 착지 데미지 — EnemyCount=%d"), Enemies.Num());
 
+	// 궁극기(R) 데미지 배율 보너스 — 괴사(아이템) "물질분열기" 등이 UltimateDamagePercent를 올려주면
+	// R 데미지가 그만큼 증가한다. 캐스트 시점이 아니라 이 착지 타격 시점에 읽어야 최신값이 반영됨.
+	const UP1AttributeSet* AttrSet = GetAbilitySystemComponentFromActorInfo() ? GetAbilitySystemComponentFromActorInfo()->GetSet<UP1AttributeSet>() : nullptr;
+	const float UltimateDamageMultiplier = 1.0f + (AttrSet ? AttrSet->GetUltimateDamagePercent() : 0.0f);
+
 	for (AActor* Enemy : Enemies)
 	{
-		ApplyDamageToTarget(Enemy, 1.0f);
+		ApplyDamageToTarget(Enemy, UltimateDamageMultiplier);
 	}
 
 #if ENABLE_DRAW_DEBUG

@@ -49,12 +49,20 @@ void UP1DamageGameplayAbility::ApplyDamageToTarget(AActor* TargetActor, float Da
 		// 왔는지" 같은 판별이 타겟 쪽(AttributeSet 등)에서 불가능해진다 — Stoicism 디플렉트 등에 필요.
 		SpecHandle.Data->CapturedSourceTags.GetSpecTags().AppendTags(GetAssetTags());
 
-		// 데미지 팝업 색상 구분용 — 유효 계수(클래스 기본값+이번 호출 Bonus) 중 우세한 쪽 태그 부여.
-		// 물리/마법 둘 다 0이면(순수 Flat 데미지) 물리로 기본 처리.
-		const float EffectivePhysCoeff = PhysicalPowerCoefficient + BonusPhysicalPowerCoeff;
-		const float EffectiveMagCoeff = MagicalPowerCoefficient + BonusMagicalPowerCoeff;
-		SpecHandle.Data->CapturedSourceTags.GetSpecTags().AddTag(
-			EffectiveMagCoeff > EffectivePhysCoeff ? TAG_Data_DamageType_Magical : TAG_Data_DamageType_Physical);
+		// 데미지 타입 태그 — bIsTrueDamage면 방어력 감산 자체를 건너뛰는 Data.DamageType.True를 부여(관통과
+		// 무관한 별개 축). 아니면 기존처럼 유효 계수(클래스 기본값+이번 호출 Bonus) 중 우세한 쪽으로 물리/마법을
+		// 구분(둘 다 0이면, 즉 순수 Flat 데미지면 물리로 기본 처리) — 이쪽은 순수 UI 색상 분류라 ExecCalc가 안 봄.
+		if (bIsTrueDamage)
+		{
+			SpecHandle.Data->CapturedSourceTags.GetSpecTags().AddTag(TAG_Data_DamageType_True);
+		}
+		else
+		{
+			const float EffectivePhysCoeff = PhysicalPowerCoefficient + BonusPhysicalPowerCoeff;
+			const float EffectiveMagCoeff = MagicalPowerCoefficient + BonusMagicalPowerCoeff;
+			SpecHandle.Data->CapturedSourceTags.GetSpecTags().AddTag(
+				EffectiveMagCoeff > EffectivePhysCoeff ? TAG_Data_DamageType_Magical : TAG_Data_DamageType_Physical);
+		}
 
 		// ExecCalc_Damage가 이 채널들을 읽어 최종 데미지를 산출한다. GE가 SetByCaller를 참조하지 않으면 무시됨.
 		// Bonus 파라미터는 클래스 기본 계수 위에 이번 호출 한정으로 얹는다 (기본 0 = 평소와 동일).

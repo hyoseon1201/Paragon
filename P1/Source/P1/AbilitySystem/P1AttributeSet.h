@@ -8,6 +8,7 @@
 #include "P1AttributeSet.generated.h"
 
 class AP1PlayerState;
+class UGameplayEffect;
 
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
 	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
@@ -99,9 +100,30 @@ public:
 	FGameplayAttributeData Tenacity;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, Tenacity)
 
+	// 0.0~1.0 비율 — 방어력(Armor/(Armor+100) 감산)과는 별개의 최종 승산 레이어. PhysicalArmor/
+	// MagicalArmor 감산까지 끝난 데미지에 (1-DamageReduction)을 곱한다(P1ExecCalc_Damage 참고).
+	// 방어력처럼 관통(Penetration)으로 무효화되지 않는 순수 최종 감쇄 — 짧은 지속시간 버프(예: 사면(아이템)
+	// "용기")로 주로 쓰일 걸 염두에 두고 설계, 상시 스탯으로도 문제없이 동작한다.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_DamageReduction, Category = "Attributes|Combat")
+	FGameplayAttributeData DamageReduction;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, DamageReduction)
+
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_AbilityHaste, Category = "Attributes|Combat")
 	FGameplayAttributeData AbilityHaste;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, AbilityHaste)
+
+	// AbilityHaste와 별개로 "궁극기(R)에만" 추가로 붙는 가속치 — 최종 R 쿨다운 감소율은
+	// UP1GameplayAbility::ApplyCooldown()이 (AbilityHaste + UltimateHaste)를 합산해 계산한다
+	// (LoL식 공식: 감소율 = Haste/(Haste+100)). Q/E/RMB 등 나머지 어빌리티는 AbilityHaste만 적용.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_UltimateHaste, Category = "Attributes|Combat")
+	FGameplayAttributeData UltimateHaste;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, UltimateHaste)
+
+	// 궁극기(R) 데미지 배율 보너스 — 0.15면 R 데미지 +15%. R 어빌리티(StoneForgedSoul/IonStrike)가
+	// 캐스트 시점에 직접 읽어 ApplyDamageToTarget의 DamageMultiplier 인자로 (1.0+이 값)을 넘긴다.
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_UltimateDamagePercent, Category = "Attributes|Combat")
+	FGameplayAttributeData UltimateDamagePercent;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, UltimateDamagePercent)
 
 	// 0.0~1.0 비율(0%~100%) — AttackSpeed 등과 달리 1.0을 넘을 일이 없어 [0,1]로 클램프한다.
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_CriticalChance, Category = "Attributes|Combat")
@@ -135,6 +157,15 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
 	FGameplayAttributeData Damage;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, Damage)
+
+	// UP1ExecCalc_Damage가 크리티컬 판정 결과(0.0/1.0)를 여기 출력(Override)한다 — 크리티컬 여부는
+	// ExecCalc 내부에서 RNG로 결정되므로 어빌리티가 스펙을 만드는 시점엔 알 수 없고, Damage 메타
+	// 어트리뷰트와 동일하게 실행 결과를 나중에 PostGameplayEffectExecute에서 읽고 즉시 리셋하는
+	// "메타 출력값" 패턴으로 전달한다(온-히트 크리티컬 반응 아이템 등이 이 값을 필요로 함, 예:
+	// 애쉬브링어의 크로노 스트라이크와 달리 크리티컬 시 스택을 더 얻는 더스트 데빌의 "매너스").
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
+	FGameplayAttributeData CriticalHitFlag;
+	ATTRIBUTE_ACCESSORS(UP1AttributeSet, CriticalHitFlag)
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
@@ -178,7 +209,13 @@ protected:
 	UFUNCTION()
 	virtual void OnRep_Tenacity(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
+	virtual void OnRep_DamageReduction(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
 	virtual void OnRep_AbilityHaste(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_UltimateHaste(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	virtual void OnRep_UltimateDamagePercent(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
 	virtual void OnRep_CriticalChance(const FGameplayAttributeData& OldValue);
 	UFUNCTION()
@@ -204,19 +241,14 @@ private:
 	// ("내가 입힌 데미지만 나에게 보인다" — LoL/Dota 컨벤션). 데미지가 실제로 적용된 경우에만 호출.
 	void NotifyDamageDealt(const FGameplayEffectModCallbackData& Data, float DamageAmount);
 
-	// 애쉬브링어(아이템) 고유효과 "크로노 스트라이크" — 가해자가 Item.Ashbringer.ChronoStrike 루즈
-	// 태그를 갖고 있고 이 데미지가 기본 공격에서 왔으면, 가해자의 Q/E/RMB 쿨다운을 대상 유형(영웅/
-	// 정글 몬스터)에 따라 다른 비율로 감소시킨다(UP1AbilitySystemComponent::ReduceCooldownByInputTag로 위임).
-	// 데미지가 실제로 적용된 경우에만 호출(무적/디플렉트로 무효화된 히트는 발동 안 함).
-	void HandleChronoStrikeProc(const FGameplayEffectModCallbackData& Data);
-
-	// 애쉬브링어 크로노 스트라이크의 대상별 쿨다운 감소율 — 이 아이템 하나에만 쓰이는 고정값이라
-	// (다른 온-히트 CDR 아이템이 생기기 전까진) 범용 데이터 구조로 뽑지 않고 EditDefaultsOnly로만 노출.
-	UPROPERTY(EditDefaultsOnly, Category = "Items|Ashbringer")
-	float ChronoStrikeHeroCDRPercent = 0.08f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Items|Ashbringer")
-	float ChronoStrikeMonsterCDRPercent = 0.04f;
+	// 온-히트 아이템 어빌리티 범용 디스패치(2026-08-17 리팩터링) — 이 데미지가 기본 공격에서 왔으면
+	// 가해자의 ASC에 Event.Character.BasicAttackHitDealt를 보낸다(Target=피격자, EventMagnitude=
+	// 크리티컬 여부). 어떤 아이템이 이 이벤트에 반응하는지는 전혀 모른다 — 아이템 구매 시 부여되는
+	// 각 아이템 전용 UP1GameplayAbility_OnHitItemAbility 파생 어빌리티가 이 이벤트를 구독해서 각자
+	// 알아서 반응한다(크로노 스트라이크/매너스가 첫 사용처). 원래 이 자리에 아이템별 HandleXxxProc
+	// 메서드를 직접 두었었는데, 아이템이 늘어날수록 AttributeSet이 계속 커지는 문제가 있어 이 훅
+	// 하나로 일반화함 — 새 온-히트 아이템이 추가돼도 이 함수는 전혀 안 바뀐다.
+	void DispatchBasicAttackHitDealt(const FGameplayEffectModCallbackData& Data, bool bWasCritical);
 
 	// 사망 확정 시 호출 — 킬러 판별, 최근 10초 내 딜 넣은 플레이어 전원에게 어시스트 지급,
 	// Kills/Deaths/Assists/KillStreak 갱신 후 골드+경험치 보상 GE를 킬러/어시스터 각자에게 적용한다.

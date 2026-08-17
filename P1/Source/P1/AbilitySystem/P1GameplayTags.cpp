@@ -16,6 +16,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Damage_SourceMaxHealthPct, "Data.Damage.
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_DamageType_Physical, "Data.DamageType.Physical", "데미지 팝업 색상 구분용 — 물리 계수가 우세한 데미지에 부여")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_DamageType_Magical, "Data.DamageType.Magical", "데미지 팝업 색상 구분용 — 마법 계수가 우세한 데미지에 부여")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_DamageType_True, "Data.DamageType.True", "고정 피해(방어력 무시) — UP1DamageGameplayAbility::bIsTrueDamage=true인 어빌리티가 Physical/Magical 대신 부여, P1ExecCalc_Damage가 방어 감산을 건너뜀")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Hero, "Character.Type.Hero", "플레이어가 조종하는 영웅 캐릭터")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Character_Type_Monster, "Character.Type.Monster", "정글 몬스터(중립 캠프)")
@@ -25,6 +26,7 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Invulnerable, "State.Invulnerable", "�
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Stunned, "State.Stunned", "기절 상태 — 베이스 어빌리티 ActivationBlockedTags에 포함되어 대부분의 어빌리티 발동을 막고, AP1PlayerController::HandleMove()가 직접 체크해 이동도 막는다")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_StunDuration, "Data.StunDuration", "기절 GE의 SetByCaller 지속시간 채널 — 소스마다 다른 기절 시간을 공유 GE 하나로 재사용")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Rooted, "State.Rooted", "캐스팅/채널링 중 이동을 막고 싶은 어빌리티가 ActivationOwnedTags에 추가하는 범용 태그 — AP1PlayerController::HandleMove()가 State.Stunned와 함께 체크")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Immobilized, "State.Immobilized", "이동 불가류 CC(스턴/에어본/속박 등) 범용 카테고리 태그 — 각 CC GE가 자기 고유 태그와 함께 이 태그도 부여하면, 아이템/스킬은 CC 종류를 몰라도 이 태그 하나만 구독하면 됨")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_Dead, "State.Dead", "사망 상태 GE가 부여하는 태그 — 전 어빌리티 ActivationBlockedTags에 포함, GE 자연 만료 시점이 리스폰 시점")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_Died, "Event.Character.Died", "AttributeSet이 Health<=0을 감지하면 보내는 이벤트 — 캐릭터가 받아 State.Dead GE를 자신에게 적용")
@@ -33,6 +35,10 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Montage_Death_Impact, "Event.Montage.De
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_HitReact, "Event.Character.HitReact", "AttributeSet이 데미지를 받고도 생존했음을 감지하면 보내는 이벤트 — 캐릭터가 받아 HitReactEffectClass를 자신에게 적용")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_State_HitReacting, "State.HitReacting", "피격 리액션 신호용 태그 — HitReactEffectClass가 부여, 카운트 0→양수 전환 시점에 리액션 몽타주 재생")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_Immobilized, "Event.Character.Immobilized", "AP1HeroCharacter가 State.Immobilized 카운트 0→양수 전이를 감지하면 보내는 이벤트 — 이동 불가 CC에 반응하는 아이템 어빌리티가 구독")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_Bravery, "Cooldown.Ability.Bravery", "사면(아이템) 고유효과 '용기'(UP1GameplayAbility_Item_Bravery)의 쿨다운 태그 — GE_Absolution_Cooldown의 Granted Tags에 지정")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Buff_TrueStrike_Empowered, "Buff.TrueStrike.Empowered", "증강(아이템) '진실의 일격' — 다음 기본공격 강화 대기 상태(4초 창) 표시 태그, GE_Item_TrueStrike_EmpowerBuff의 Granted Tags에 지정")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_TrueStrike, "Cooldown.Ability.TrueStrike", "증강(아이템) '진실의 일격' 자체의 쿨다운(1.5초) 태그 — GE_Item_TrueStrike_Cooldown의 Granted Tags에 지정")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Heal_Flat, "Data.Heal.Flat", "즉시 회복 GE의 SetByCaller 채널 — 계수 적용까지 끝난 최종 회복량")
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Data_Mana_Flat, "Data.Mana.Flat", "즉시 마나 회복 GE의 SetByCaller 채널")
@@ -91,4 +97,4 @@ UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Ability_IonStrike, "Ability.IonStrike", "Ion 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Cooldown_Ability_IonStrike, "Cooldown.Ability.IonStrike", "Ion Strike 쿨다운 GE가 부여하는 태그")
 
 UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Monster_MeleeAttack, "Event.Monster.MeleeAttack", "정글 몬스터 AIController의 BT 태스크가 근접 공격 어빌리티를 트리거하는 이벤트")
-UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Item_Ashbringer_ChronoStrike, "Item.Ashbringer.ChronoStrike", "애쉬브링어 보유 확인용 루즈 태그 — 기본 공격 적중 시 Q/E/RMB 쿨다운 감소(크로노 스트라이크) 발동 조건")
+UE_DEFINE_GAMEPLAY_TAG_COMMENT(TAG_Event_Character_BasicAttackHitDealt, "Event.Character.BasicAttackHitDealt", "기본 공격 데미지가 실제로 적용됐을 때 가해자 ASC로 보내는 범용 이벤트 — 온-히트 아이템 어빌리티들의 공통 트리거")

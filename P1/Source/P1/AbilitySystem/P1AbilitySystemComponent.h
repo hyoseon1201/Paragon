@@ -39,7 +39,7 @@ public:
 	// 하나(Duration=SetByCaller Data.CooldownDuration, 고정 Granted Tags 없음)를 그 어빌리티의 실제
 	// 쿨다운 태그(UGameplayAbility::GetCooldownTags())로 동적 태깅해서 재사용한다(AssaultTheGates가
 	// 자기 자신에게만 하던 "남은시간 재계산 후 제거+재적용"을 여러 어빌리티에 범용으로 적용한 버전).
-	// 애쉬브링어(아이템) 고유효과 "크로노 스트라이크"가 첫 사용처 — UP1AttributeSet::HandleChronoStrikeProc 참고.
+	// 애쉬브링어(아이템) 고유효과 "크로노 스트라이크"가 첫 사용처 — UP1GameplayAbility_Item_ChronoStrike 참고.
 	void ReduceCooldownByInputTag(FGameplayTag InputTag, float Percent);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

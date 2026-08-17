@@ -82,7 +82,10 @@ void UP1GameplayAbility_PhotonDisruptor::OnTargetDataReady(const FGameplayAbilit
 
 	const FVector ConfirmedEnd = UAbilitySystemBlueprintLibrary::GetTargetDataEndPoint(Data, 0);
 
-	// 확정 시 코스트+쿨다운을 함께 커밋. 감당 못하면 무취소 종료(조준만 했을 뿐 아무것도 소모 안 됨).
+	// 확정 시 코스트+쿨다운을 함께 커밋 — 스킬샷 계열(짧은 SweepDuration=1.6초짜리 발사체 연출)이라
+	// "쓰는 순간 쿨다운이 돈다"는 일반적인 MOBA 컨벤션을 따른다(채널링형인 MakeWay/IonStrike와 다른 점 —
+	// 그쪽은 지속시간 내내 스킬을 "쓰는 중"이라 지속시간이 끝나야 쿨다운이 도는 게 자연스러움). 감당
+	// 못하면 무취소 종료(조준만 했을 뿐 아무것도 소모 안 됨).
 	if (!CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
 	{
 		UE_LOG(LogP1, Log, TEXT("[PhotonDisruptor] 커밋 실패(코스트/쿨다운) — 취소"));
@@ -91,8 +94,6 @@ void UP1GameplayAbility_PhotonDisruptor::OnTargetDataReady(const FGameplayAbilit
 	}
 
 	CurrentTick = 0;
-	bCooldownApplied = false;
-	bCommitted = true;
 	SetRootedState(true);
 
 	if (CurrentActorInfo->IsNetAuthority())
@@ -215,17 +216,6 @@ void UP1GameplayAbility_PhotonDisruptor::OnBlastTick()
 	if (GetWorld()->GetTimeSeconds() - SweepStartTime >= SweepDuration)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(BlastTimerHandle);
-
-		if (!bCooldownApplied)
-		{
-			const UGameplayEffect* CooldownGE = GetCooldownGameplayEffect();
-			if (CooldownGE)
-			{
-				ApplyEffectToSelf(CooldownGE->GetClass());
-			}
-			bCooldownApplied = true;
-		}
-
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 	}
 }
@@ -240,21 +230,10 @@ void UP1GameplayAbility_PhotonDisruptor::EndAbility(const FGameplayAbilitySpecHa
 	}
 
 	// 정상 발사든 조준 취소든 강제 중단(스턴 등)이든 항상 이 경로를 거치므로 태그 정리를 일괄 처리.
+	// 코스트/쿨다운은 확정 시점에 CommitAbility()로 이미 함께 커밋됐으므로(조준만 하다 취소한 경우는
+	// CommitAbility 자체가 안 불려서 애초에 무소모) 여기서 따로 처리할 게 없다.
 	SetTargetingState(false);
 	SetRootedState(false);
-
-	// 중간에 취소/중단되어 전 틱을 다 못 채웠어도 코스트는 이미 소모됐으므로 쿨다운은 적용한다(MakeWay와
-	// 동일 이유) — 단, bCommitted가 false면(조준만 하다 취소, CommitAbility 자체가 안 불림) 코스트도
-	// 안 나간 순수 취소이므로 쿨다운도 걸면 안 된다(AssaultTheGates 등과 동일한 "취소 시 완전 무소모").
-	if (bCommitted && !bCooldownApplied)
-	{
-		const UGameplayEffect* CooldownGE = GetCooldownGameplayEffect();
-		if (CooldownGE)
-		{
-			ApplyEffectToSelf(CooldownGE->GetClass());
-		}
-		bCooldownApplied = true;
-	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

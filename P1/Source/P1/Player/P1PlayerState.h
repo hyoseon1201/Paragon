@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "GenericTeamAgentInterface.h"
 #include "ActiveGameplayEffectHandle.h"
+#include "GameplayAbilitySpecHandle.h"
 #include "P1PlayerState.generated.h"
 
 class UP1AbilitySystemComponent;
@@ -14,6 +15,7 @@ class UP1AttributeSet;
 class UCurveTable;
 class UDataTable;
 class UGameplayEffect;
+class UGameplayAbility;
 
 UCLASS()
 class P1_API AP1PlayerState : public APlayerState, public IAbilitySystemInterface, public IGenericTeamAgentInterface
@@ -238,6 +240,11 @@ protected:
 	// 효과들만 제거하기 위한 서버 전용 북키핑 — 클라이언트는 Inventory(FName 배열)만 보면 되므로
 	// 복제 안 함(같은 아이템 중복 보유가 금지돼 있어 FName 하나당 이 배열 하나로 충분히 안전하다).
 	TMap<FName, TArray<FActiveGameplayEffectHandle>> ActiveItemEffects;
+
+	// 아이템ID → 그 아이템 구매로 부여된 모든 FGameplayAbilitySpecHandle(UniqueAbilities[].TriggeredAbilityClass,
+	// 반응형 온-히트 아이템 어빌리티) — ActiveItemEffects와 동일한 이유로 서버 전용 북키핑, 판매 시
+	// 이 핸들들로 ASC->ClearAbility()를 호출해 정확히 그 어빌리티들만 회수한다.
+	TMap<FName, TArray<FGameplayAbilitySpecHandle>> ActiveItemAbilities;
 
 	// Instant GE 하나로 골드를 가감(Delta 부호로 증감 결정) — ApplyFlatRestoreEffect(AP1HeroCharacter)와
 	// 같은 패턴이지만 PlayerState는 자기 ASC를 직접 갖고 있어 Character를 거칠 필요가 없다.

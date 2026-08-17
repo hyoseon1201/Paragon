@@ -27,6 +27,12 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Damage_SourceMaxHealthPct)
 // 어트리뷰트/방어력 계산 자체에는 관여하지 않는 순수 UI용 분류 — ExecCalc_Damage는 이 태그를 모른다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_DamageType_Physical)
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_DamageType_Magical)
+// **위 둘과 달리 UI 전용이 아니다** — `UP1DamageGameplayAbility::bIsTrueDamage=true`인 어빌리티가
+// Physical/Magical 대신 이 태그를 붙이면(둘 중 하나만 배타적으로 부여됨), `P1ExecCalc_Damage`가 방어력
+// 감산(Armor/(Armor+100))을 완전히 건너뛴다 — 관통(Penetration)으로 무효화되는 게 아니라 애초에 방어력
+// 계산 자체가 없는 별개 축(단, DamageReduction 같은 % 감쇄 효과는 그대로 적용됨 — "고정 피해"는 방어력만
+// 무시하지 전체 방어 시스템을 무시하지 않는 일반적인 MOBA 컨벤션). 증강(아이템) "진실의 일격"이 첫 사용처.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_DamageType_True)
 
 // 캐릭터 유형 — RMB 쿨감/버프 조건("영웅 적중 시") 등에서 대상 유형 판별에 사용.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Character_Type_Hero)
@@ -46,6 +52,13 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stunned)
 // 기절 GE의 Duration SetByCaller 채널 — 소스마다 기절 시간이 다르므로(예: 거리 비례 스케일) 공유 GE
 // 하나를 여러 어빌리티가 값만 다르게 넣어 재사용한다(Data.CooldownDuration과 동일한 패턴).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_StunDuration)
+
+// "이동 불가"류 CC(스턴/에어본/속박 등) 전체를 아우르는 범용 카테고리 태그 — 구체적인 CC 태그
+// (State.Stunned 등)와 별개로, 그 CC GE의 Granted Tags에 이 태그도 함께 추가해두면 "이동 불가에
+// 걸리면 반응"하는 아이템/스킬(예: 사면(아이템) "용기")이 CC 종류를 하나하나 몰라도 이 태그 하나만
+// 구독해서 전부 감지할 수 있다. 지금은 스턴 GE만 이 태그를 부여하지만, 나중에 에어본/속박이 추가돼도
+// 그 GE의 Granted Tags에 이 태그만 얹으면 되고 아이템/스킬 쪽 코드는 전혀 안 바뀐다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Immobilized)
 
 // 캐스팅/채널링 중 이동을 막고 싶은 어빌리티가 자기 ActivationOwnedTags에 추가하는 범용 태그(전 어빌리티
 // 공용, State.Stunned와 동일한 패턴) — AP1PlayerController::HandleMove()가 이 태그도 함께 체크한다.
@@ -75,6 +88,24 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Character_HitReact)
 // HitReactEffectClass가 부여하는 신호용 태그 — 값 자체엔 의미 없고, 카운트가 0→양수로 바뀌는 순간만
 // 감지해 리액션 몽타주를 재생한다(제거 시점엔 아무것도 안 함, 몽타주는 짧은 원샷이라 스스로 끝남).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_HitReacting)
+
+// AP1HeroCharacter가 State.Immobilized 태그 카운트 0→양수 전이(서버)를 감지하면 자신의 ASC로 보내는
+// 이벤트 — "이동 불가에 걸리면 반응"하는 아이템 어빌리티(사면(아이템) "용기"가 첫 사용처)가
+// AbilityTriggers로 구독한다. Event.Character.BasicAttackHitDealt와 동일한 범용 디스패치 원칙 —
+// 발신자(캐릭터 클래스)는 어떤 아이템이 반응하는지 전혀 모른다.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Character_Immobilized)
+
+// 사면(아이템) 고유효과 "용기"(UP1GameplayAbility_Item_Bravery)의 쿨다운 태그 — GE_Absolution_Cooldown의
+// Granted Tags에 이 태그를 지정해야 한다(다른 어빌리티들의 Cooldown.Ability.X와 동일 컨벤션).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_Bravery)
+
+// 증강(아이템) 고유효과 "진실의 일격"(UP1GameplayAbility_Item_TrueStrike) — Q/E/RMB/R 중 하나를 사용하면
+// 이 태그가 부여되는 4초짜리 버프가 걸리고("다음 기본공격 강화" 대기 상태), 그 안에 기본공격이 적중하면
+// 소모되며 고정 피해를 추가로 입힌다. GE_Item_TrueStrike_EmpowerBuff의 Granted Tags에 지정.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Buff_TrueStrike_Empowered)
+// "진실의 일격" 자체의 쿨다운(1.5초, 스킬 사용→버프 부여 사이의 재발동 간격) — GE_Item_TrueStrike_Cooldown의
+// Granted Tags에 지정.
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_TrueStrike)
 
 // 즉시 회복 GE의 SetByCaller 채널 — 최종 회복량(계수 적용까지 끝난 값)을 어빌리티가 C++에서 계산해 넣는다.
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Data_Heal_Flat)
@@ -188,9 +219,13 @@ UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_Ability_IonStrike)
 // 어빌리티가 UP1DamageGameplayAbility::GetEnemiesInRadius로 직접 재조회(EventData에 타겟을 안 실음).
 UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Monster_MeleeAttack)
 
-// --- 아이템: 애쉬브링어(고유효과 "크로노 스트라이크" — 기본 공격 적중 시 Q/E/RMB 쿨다운 감소) ---
-// 아이템 구매 시 적용되는 Infinite GE가 부여하는 존재 확인용 루즈 태그 — Ability.StoicismDeflect와
-// 동일한 패턴(AttributeSet이 아이템 자체를 몰라도 이 태그 유무만으로 "이 캐릭터가 애쉬브링어를
-// 보유 중인지" 판별). 실제 발동(기본 공격 적중 감지→쿨다운 감소)은 UP1AttributeSet::
-// PostGameplayEffectExecute에서 처리하고, 감소는 범용 UP1AbilitySystemComponent::ReduceCooldownByInputTag로 위임.
-UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Item_Ashbringer_ChronoStrike)
+// --- 온-히트 아이템 어빌리티 범용 디스패치 ---
+// UP1AttributeSet::PostGameplayEffectExecute가 기본 공격 데미지 적용을 감지하면 가해자(공격자)의 ASC에
+// 보내는 이벤트 — 페이로드는 EventData.Target(피격자 액터)+EventData.EventMagnitude(1.0=크리티컬,
+// 0.0=평타). 아이템 구매 시 부여되는 각 아이템 전용 어빌리티(UP1GameplayAbility_OnHitItemAbility 파생)가
+// AbilityTriggers로 이 이벤트 하나를 공통 구독한다 — AttributeSet은 어떤 아이템이 존재하는지, 뭘 하는지
+// 전혀 몰라도 되고(어빌리티 클래스 참조 금지 원칙 준수), 새 온-히트 아이템이 추가돼도 AttributeSet
+// 쪽 코드는 전혀 안 바뀐다(스토이시즘 디플렉트가 확립한 "감지는 AttributeSet, 반응은 어빌리티" 분리를
+// 아이템 전체로 일반화한 것 — 원래 애쉬브링어/더스트 데빌을 AttributeSet 전용 메서드로 만들었다가
+// 클린코드 관점에서 아이템 수만큼 AttributeSet이 계속 커지는 문제가 지적돼 2026-08-17에 리팩터링함).
+UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Character_BasicAttackHitDealt)

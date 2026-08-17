@@ -49,7 +49,13 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> AbilityHasteText;
 	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> UltimateHasteText;
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> UltimateDamagePercentText;
+	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TenacityText;
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> DamageReductionText;
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> CriticalChanceText;
 	UPROPERTY(meta = (BindWidgetOptional))

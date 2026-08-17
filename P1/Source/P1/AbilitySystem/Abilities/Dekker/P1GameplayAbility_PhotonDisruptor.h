@@ -129,11 +129,6 @@ private:
 	bool bTargetingActive = false;
 	bool bRootedActive = false;
 
-	// CommitAbility()가 실제로 성공해 스윕이 시작됐는지 — false면(조준만 하다 취소) EndAbility의 쿨다운
-	// 세이프티넷을 걸지 않는다. 코스트도 안 나간 순수 취소에 쿨다운만 걸리는 건 다른 지면조준 스킬
-	// (AssaultTheGates/StasisBomb/ContainmentFence)의 "취소 시 완전 무소모" 컨벤션과 어긋난다.
-	bool bCommitted = false;
-
 	FTimerHandle BlastTimerHandle;
 	int32 CurrentTick = 0;
 	FVector GroundStart = FVector::ZeroVector;
@@ -141,7 +136,4 @@ private:
 
 	// OnBlastTick이 "지금까지 얼마나 지났는지"를 계산하는 기준 시각.
 	double SweepStartTime = 0.0;
-
-	// EndAbility가 여러 경로(정상 종료/중단)로 여러 번 불려도 쿨다운이 중복 적용되지 않도록 하는 가드.
-	bool bCooldownApplied = false;
 };

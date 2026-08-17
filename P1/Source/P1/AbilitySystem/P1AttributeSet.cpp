@@ -38,7 +38,10 @@ UP1AttributeSet::UP1AttributeSet()
 	InitMagicalPenetration(0.0f);
 	InitLifeSteal(0.0f);
 	InitTenacity(0.0f);
+	InitDamageReduction(0.0f);
 	InitAbilityHaste(0.0f);
+	InitUltimateHaste(0.0f);
+	InitUltimateDamagePercent(0.0f);
 	InitCriticalChance(0.0f);
 	InitCriticalDamage(1.5f);
 
@@ -71,7 +74,10 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MagicalPenetration, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, LifeSteal, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Tenacity, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, DamageReduction, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AbilityHaste, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, UltimateHaste, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, UltimateDamagePercent, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalChance, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalDamage, COND_None, REPNOTIFY_Always);
 
@@ -107,6 +113,14 @@ void UP1AttributeSet::ClampAttribute(const FGameplayAttribute& Attribute, float&
 	{
 		NewValue = FMath::Max(NewValue, 0.0f);
 	}
+	else if (Attribute == GetUltimateHasteAttribute() || Attribute == GetUltimateDamagePercentAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.0f);
+	}
+	else if (Attribute == GetDamageReductionAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
+	}
 	else if (Attribute == GetCriticalChanceAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, 1.0f);
@@ -136,6 +150,12 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 		// 메타 Damage → Health 변환. ExecCalc가 방어/관통까지 반영한 최종값을 누적해둔다.
 		const float LocalDamage = GetDamage();
 		SetDamage(0.0f);
+
+		// 메타 CriticalHitFlag → 이번 히트가 크리티컬이었는지(Damage와 동일한 "즉시 읽고 리셋" 패턴).
+		// ExecCalc 내부 RNG 결과라 스펙 생성 시점엔 알 수 없어 실행 결과로만 전달 가능 — 더스트 데빌의
+		// "매너스"처럼 크리티컬 적중에 반응해야 하는 온-히트 아이템이 이 값을 읽는다.
+		const bool bWasCritical = GetCriticalHitFlag() > 0.5f;
+		SetCriticalHitFlag(0.0f);
 
 		UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
 
@@ -176,8 +196,8 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 			// 어시스트 판정용 — 실제로 관통된 데미지만 "기여"로 기록(무적/디플렉트는 애초에 이 분기 진입 안 함).
 			RecordDamageContribution(Data);
 
-			// 애쉬브링어 크로노 스트라이크 — 생존/사망 여부와 무관하게 적중 자체로 발동(막타여도 발동).
-			HandleChronoStrikeProc(Data);
+			// 온-히트 아이템 어빌리티 범용 디스패치 — 생존/사망 여부와 무관하게 적중 자체로 발동(막타여도 발동).
+			DispatchBasicAttackHitDealt(Data, bWasCritical);
 
 			// 사망 감지 — State.Dead가 이미 있으면(중복 판정 등) 재발신하지 않는다.
 			// GE 적용 자체는 캐릭터 클래스에 위임한다(AttributeSet은 캐릭터 타입을 몰라야 함).
@@ -325,9 +345,24 @@ void UP1AttributeSet::OnRep_Tenacity(const FGameplayAttributeData& OldValue)
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, Tenacity, OldValue);
 }
 
+void UP1AttributeSet::OnRep_DamageReduction(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, DamageReduction, OldValue);
+}
+
 void UP1AttributeSet::OnRep_AbilityHaste(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, AbilityHaste, OldValue);
+}
+
+void UP1AttributeSet::OnRep_UltimateHaste(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, UltimateHaste, OldValue);
+}
+
+void UP1AttributeSet::OnRep_UltimateDamagePercent(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, UltimateDamagePercent, OldValue);
 }
 
 void UP1AttributeSet::OnRep_CriticalChance(const FGameplayAttributeData& OldValue)
@@ -406,7 +441,7 @@ void UP1AttributeSet::RecordDamageContribution(const FGameplayEffectModCallbackD
 	RecentDamageContributors.Add(InstigatorPS, World ? World->GetTimeSeconds() : 0.0f);
 }
 
-void UP1AttributeSet::HandleChronoStrikeProc(const FGameplayEffectModCallbackData& Data)
+void UP1AttributeSet::DispatchBasicAttackHitDealt(const FGameplayEffectModCallbackData& Data, bool bWasCritical)
 {
 	const FGameplayTagContainer* SourceTags = Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
 	if (!SourceTags || !SourceTags->HasTag(TAG_Ability_BasicAttack))
@@ -416,26 +451,19 @@ void UP1AttributeSet::HandleChronoStrikeProc(const FGameplayEffectModCallbackDat
 
 	AP1PlayerState* InstigatorPS = Cast<AP1PlayerState>(Data.EffectSpec.GetEffectContext().GetInstigator());
 	UAbilitySystemComponent* InstigatorASC = InstigatorPS ? InstigatorPS->GetAbilitySystemComponent() : nullptr;
-	if (!InstigatorASC || !InstigatorASC->HasMatchingGameplayTag(TAG_Item_Ashbringer_ChronoStrike))
-	{
-		return; // 애쉬브링어 미보유 — 발동 안 함.
-	}
-
-	UP1AbilitySystemComponent* InstigatorP1ASC = Cast<UP1AbilitySystemComponent>(InstigatorASC);
-	if (!InstigatorP1ASC)
+	if (!InstigatorASC)
 	{
 		return;
 	}
 
-	// 대상(=이 AttributeSet의 소유자, 피해자)이 정글 몬스터면 4%, 영웅이면 8% — HandleKillRewards/
-	// HandleMonsterKillRewards와 동일한 판별 방식(ASC OwnerActor가 AP1PlayerState로 캐스트되면 영웅,
-	// 실패하면 몬스터 Pawn 자신 — 몬스터는 ASC를 PlayerState가 아니라 Pawn이 직접 호스팅하므로).
-	const bool bTargetIsMonster = Cast<AP1PlayerState>(GetOwningActor()) == nullptr;
-	const float Percent = bTargetIsMonster ? ChronoStrikeMonsterCDRPercent : ChronoStrikeHeroCDRPercent;
-
-	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_Q, Percent);
-	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_E, Percent);
-	InstigatorP1ASC->ReduceCooldownByInputTag(TAG_InputTag_Ability_RMB, Percent);
+	// 어떤 아이템이 이 이벤트를 구독하는지 여기서는 전혀 모른다 — 그건 각 온-히트 아이템 어빌리티
+	// (구매 시 GiveAbility로 부여됨)의 AbilityTriggers 몫이다. 이 함수는 "때렸다"는 사실과
+	// 피격자/크리티컬 여부만 실어 보낸다.
+	FGameplayEventData EventData;
+	EventData.EventTag = TAG_Event_Character_BasicAttackHitDealt;
+	EventData.Target = GetOwningActor();
+	EventData.EventMagnitude = bWasCritical ? 1.0f : 0.0f;
+	InstigatorASC->HandleGameplayEvent(TAG_Event_Character_BasicAttackHitDealt, &EventData);
 }
 
 void UP1AttributeSet::HandleKillRewards(const FGameplayEffectModCallbackData& Data)

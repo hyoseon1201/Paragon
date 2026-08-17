@@ -6,6 +6,8 @@
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
@@ -60,6 +62,26 @@ void AP1CharacterBase::MulticastPlayParticleEffect_Implementation(UParticleSyste
 	}
 
 	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ParticleTemplate, GetActorLocation());
+}
+
+void AP1CharacterBase::MulticastPlayNiagaraEffect_Implementation(UNiagaraSystem* NiagaraTemplate, FName SocketName)
+{
+	if (!NiagaraTemplate)
+	{
+		return;
+	}
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		if (!SocketName.IsNone() && MeshComp->DoesSocketExist(SocketName))
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAttached(NiagaraTemplate, MeshComp, SocketName,
+				FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true);
+			return;
+		}
+	}
+
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), NiagaraTemplate, GetActorLocation());
 }
 
 void AP1CharacterBase::MulticastPlayParticleEffectAtLocation_Implementation(UParticleSystem* ParticleTemplate, FVector Location, FRotator Rotation, FVector Scale)

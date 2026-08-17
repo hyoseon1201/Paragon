@@ -3,6 +3,7 @@
 #include "AbilitySystem/Abilities/Dekker/P1GameplayAbility_IonStrike.h"
 #include "P1.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "AbilitySystem/P1AttributeSet.h"
 #include "AbilitySystem/TargetActors/P1TargetActor_GroundDecal_Deferred.h"
 #include "Characters/P1CharacterBase.h"
 #include "AbilitySystemComponent.h"
@@ -140,9 +141,14 @@ void UP1GameplayAbility_IonStrike::OnRainTick()
 
 			UE_LOG(LogP1, Log, TEXT("[IonStrike] Tick %d/%d — EnemyCount=%d"), CurrentTick, TotalTicks, Enemies.Num());
 
+			// 궁극기(R) 데미지 배율 보너스 — 괴사(아이템) "물질분열기" 등이 UltimateDamagePercent를
+			// 올려주면 R의 매 틱 데미지가 그만큼 증가한다.
+			const UP1AttributeSet* AttrSet = GetAbilitySystemComponentFromActorInfo() ? GetAbilitySystemComponentFromActorInfo()->GetSet<UP1AttributeSet>() : nullptr;
+			const float UltimateDamageMultiplier = 1.0f + (AttrSet ? AttrSet->GetUltimateDamagePercent() : 0.0f);
+
 			for (AActor* Enemy : Enemies)
 			{
-				ApplyDamageToTarget(Enemy, 1.0f);
+				ApplyDamageToTarget(Enemy, UltimateDamageMultiplier);
 
 				if (MagicalArmorShredDebuffEffectClass)
 				{

@@ -2,6 +2,8 @@
 
 #include "AbilitySystem/P1GameplayAbility.h"
 #include "AbilitySystem/P1GameplayTags.h"
+#include "AbilitySystem/P1AbilitySystemComponent.h"
+#include "AbilitySystem/P1AttributeSet.h"
 #include "Characters/P1CharacterBase.h"
 #include "Player/P1PlayerController.h"
 #include "Player/P1PlayerState.h"
@@ -93,6 +95,42 @@ bool UP1GameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Han
 	return true;
 }
 
+void UP1GameplayAbility::ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo) const
+{
+	Super::ApplyCooldown(Handle, ActorInfo, ActivationInfo);
+	ApplyAbilityHasteToCommittedCooldown();
+}
+
+void UP1GameplayAbility::ApplyAbilityHasteToCommittedCooldown() const
+{
+	// InputTag가 없는 어빌리티(아이템 반응형 어빌리티 등)는 ReduceCooldownByInputTag가 애초에 찾을 수
+	// 없으므로 자연히 스킵된다 — 별도 조기 리턴 불필요, 그냥 진행해도 안전.
+	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
+	UP1AbilitySystemComponent* P1ASC = ActorInfo ? Cast<UP1AbilitySystemComponent>(ActorInfo->AbilitySystemComponent.Get()) : nullptr;
+	const UP1AttributeSet* AttrSet = P1ASC ? P1ASC->GetSet<UP1AttributeSet>() : nullptr;
+	if (!P1ASC || !AttrSet || !InputTag.IsValid())
+	{
+		return;
+	}
+
+	// 궁극기(R)면 AbilityHaste에 UltimateHaste를 더해서 계산 — 나머지 어빌리티는 AbilityHaste만.
+	float Haste = AttrSet->GetAbilityHaste();
+	if (InputTag.MatchesTagExact(TAG_InputTag_Ability_R))
+	{
+		Haste += AttrSet->GetUltimateHaste();
+	}
+
+	if (Haste <= 0.0f)
+	{
+		return;
+	}
+
+	// LoL식 공식: 감소율 = Haste/(Haste+100) — 예: Haste 25 → 20% 감소.
+	const float Percent = Haste / (Haste + 100.0f);
+	P1ASC->ReduceCooldownByInputTag(InputTag, Percent);
+}
+
 FActiveGameplayEffectHandle UP1GameplayAbility::ApplyEffectToSelf(TSubclassOf<UGameplayEffect> EffectClass,
 	FGameplayTag SetByCallerTag, float SetByCallerMagnitude) const
 {
@@ -112,5 +150,19 @@ FActiveGameplayEffectHandle UP1GameplayAbility::ApplyEffectToSelf(TSubclassOf<UG
 		SpecHandle.Data->SetSetByCallerMagnitude(SetByCallerTag, SetByCallerMagnitude);
 	}
 
-	return ApplyGameplayEffectSpecToOwner(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle);
+	const FActiveGameplayEffectHandle Handle = ApplyGameplayEffectSpecToOwner(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, SpecHandle);
+
+	// 이 프로젝트 대부분의 실제 스킬(MakeWay/IonStrike/PhotonDisruptor/AssaultTheGates/StoicismDeflect/
+	// RocketBoots 등)은 "코스트/쿨다운 분리" 컨벤션 때문에 표준 CommitAbilityCooldown()이 아니라
+	// ApplyEffectToSelf(CooldownGE->GetClass())로 쿨다운을 직접 적용한다 — 그래서 위 ApplyCooldown()
+	// 오버라이드가 걸리지 않는다. 지금 적용한 EffectClass가 이 어빌리티 자신의 쿨다운 GE와 같으면
+	// (모든 호출부가 GetCooldownGameplayEffect()에서 얻은 클래스를 그대로 넘기므로 이 비교만으로 충분히
+	// 식별 가능 — 호출부를 일일이 고칠 필요 없음) 방금 건 쿨다운에도 동일하게 헤이스트를 적용한다.
+	const UGameplayEffect* CooldownGE = GetCooldownGameplayEffect();
+	if (CooldownGE && EffectClass == CooldownGE->GetClass())
+	{
+		ApplyAbilityHasteToCommittedCooldown();
+	}
+
+	return Handle;
 }

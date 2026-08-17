@@ -69,6 +69,8 @@ void AP1JungleMonsterCharacter::BeginPlay()
 		.AddUObject(this, &AP1JungleMonsterCharacter::OnHitReactEventReceived);
 	AbilitySystemComponent->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Character_Died)
 		.AddUObject(this, &AP1JungleMonsterCharacter::OnDiedEventReceived);
+	AbilitySystemComponent->RegisterGameplayTagEvent(TAG_State_Stunned, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &AP1JungleMonsterCharacter::OnStunTagChanged);
 
 	if (HasAuthority())
 	{
@@ -312,6 +314,39 @@ void AP1JungleMonsterCharacter::OnDiedEventReceived(const FGameplayEventData* Pa
 	else
 	{
 		Destroy();
+	}
+}
+
+void AP1JungleMonsterCharacter::OnStunTagChanged(FGameplayTag Tag, int32 NewCount)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AAIController* AICon = Cast<AAIController>(GetController());
+	if (!AICon)
+	{
+		return;
+	}
+
+	UBrainComponent* Brain = AICon->GetBrainComponent();
+
+	if (NewCount > 0)
+	{
+		// 이미 이동 중이던 걸 즉시 멈추고(StopMovement) BT 틱 자체를 정지(PauseLogic) — 공격(어빌리티
+		// 발동)은 베이스 UP1GameplayAbility의 ActivationBlockedTags(State.Stunned)로 이미 막혀있으므로
+		// 여기선 이동만 신경 쓰면 된다.
+		AICon->StopMovement();
+		if (Brain)
+		{
+			Brain->PauseLogic(TEXT("Stunned"));
+		}
+	}
+	else if (Brain && Brain->IsPaused())
+	{
+		// TargetActor 블랙보드 키가 그대로 남아있으면 Combat 브랜치가 이어서 재개된다 — 별도 복구 로직 불필요.
+		Brain->ResumeLogic(TEXT("Stunned"));
 	}
 }
 

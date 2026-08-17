@@ -16,6 +16,7 @@ class UP1FloatingStatusWidgetController;
 class UMaterialInterface;
 class UParticleSystem;
 class UParticleSystemComponent;
+class UNiagaraSystem;
 
 UCLASS(Abstract)
 class P1_API AP1CharacterBase : public ACharacter, public IAbilitySystemInterface, public IGenericTeamAgentInterface
@@ -48,6 +49,12 @@ public:
 
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastPlayParticleEffect(UParticleSystem* ParticleTemplate, FName SocketName);
+
+	// 위와 동일한 1회성/소켓부착 이펙트지만 Niagara용 — 레거시 Cascade(UParticleSystem)와 현대
+	// Niagara(UNiagaraSystem)는 타입 자체가 다른 별개 시스템이라 같은 함수로 겸용할 수 없다. 신규 이펙트는
+	// 가능하면 이쪽을 사용(사면(아이템) "용기"/증강(아이템) "진실의 일격"이 첫 사용처).
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayNiagaraEffect(UNiagaraSystem* NiagaraTemplate, FName SocketName);
 
 	// 위와 동일한 1회성 이펙트지만, 소켓이 아니라 캐릭터와 무관한 임의의 월드 좌표에 재생한다 — 예를 들어
 	// 캐릭터 주변이 아니라 스킬 궤적을 따라 이동하는 지점(지면 블래스트 등)에 재생해야 하는 경우.

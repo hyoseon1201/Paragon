@@ -92,6 +92,10 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 	// 같은 이유로 재검토가 필요할 수 있음).
 	ASC->RegisterGameplayTagEvent(TAG_State_Stunned, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnStunTagChanged);
 
+	// State.Immobilized — 스턴 전용 로직(OnStunTagChanged)과 별개로, "이동 불가에 반응"하는 아이템
+	// 어빌리티를 위한 범용 이벤트 디스패치만 담당(자세한 설계 배경은 헤더 주석 참고).
+	ASC->RegisterGameplayTagEvent(TAG_State_Immobilized, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &AP1HeroCharacter::OnImmobilizedTagChanged);
+
 	// 피격 리액션 — Died/Stun과 동일한 패턴(이벤트는 서버 전용 GE 적용 트리거, 실제 재생은 태그 복제로
 	// 전 클라이언트에 전파).
 	ASC->GenericGameplayEventCallbacks.FindOrAdd(TAG_Event_Character_HitReact).AddUObject(this, &AP1HeroCharacter::OnHitReactEventReceived);
@@ -448,6 +452,26 @@ void AP1HeroCharacter::OnStunTagChanged(FGameplayTag Tag, int32 NewCount)
 			}
 		}
 	}
+}
+
+void AP1HeroCharacter::OnImmobilizedTagChanged(FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount <= 0 || !HasAuthority())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = CachedAbilitySystemComponent.Get();
+	if (!IsValid(ASC))
+	{
+		return;
+	}
+
+	UE_LOG(LogP1, Log, TEXT("[CC] OnImmobilizedTagChanged — Event.Character.Immobilized 발신 (%s)"), *GetName());
+
+	FGameplayEventData EventData;
+	EventData.EventTag = TAG_Event_Character_Immobilized;
+	ASC->HandleGameplayEvent(TAG_Event_Character_Immobilized, &EventData);
 }
 
 void AP1HeroCharacter::OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason)

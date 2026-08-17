@@ -66,10 +66,25 @@ public:
 		const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
 		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
+	// 표준 쿨다운 커밋(Super) 직후, AbilityHaste(전 어빌리티 공통) + 궁극기(R)면 UltimateHaste까지 합산한
+	// 감소율(LoL식 공식: Haste/(Haste+100))만큼 방금 건 쿨다운을 즉시 줄인다 — 이 어빌리티가 InputTag를
+	// 갖고 있어야(=Q/E/RMB/R처럼 실제 슬롯 어빌리티) 적용되고, 아이템 반응형 어빌리티처럼 InputTag가
+	// 없는 것들은 자연히 스킵된다. `UP1AbilitySystemComponent::ReduceCooldownByInputTag`를 그대로
+	// 재사용 — 이 자리에서 GE를 직접 다시 만들지 않는다.
+	virtual void ApplyCooldown(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo) const override;
+
 	// 베이스 UGameplayAbility::ActivationOwnedTags는 protected라 외부(캐릭터 클래스 등)에서 "이 어빌리티가
 	// 활성 상태일 때 특정 태그를 소유하는지"를 확인할 방법이 없다 — 스턴 등으로 진행 중인 어빌리티를 선별
 	// 취소해야 하는 곳(AP1HeroCharacter::CancelActiveAbilitiesOnStun)에 필요해 얇은 접근자로 노출한다.
 	bool OwnsActivationTag(const FGameplayTag& Tag) const { return ActivationOwnedTags.HasTag(Tag); }
+
+private:
+	// AbilityHaste(+궁극기면 UltimateHaste)를 InputTag 기준 방금 커밋된 쿨다운에 즉시 적용한다.
+	// `ApplyCooldown()`(표준 CommitAbilityCooldown 경로)과 `ApplyEffectToSelf()`(이 프로젝트 대부분의
+	// 실제 스킬이 쓰는 "코스트/쿨다운 분리" 수동 쿨다운 적용 경로 — MakeWay/IonStrike/PhotonDisruptor/
+	// AssaultTheGates/StoicismDeflect/RocketBoots 등) 양쪽에서 공유 호출한다.
+	void ApplyAbilityHasteToCommittedCooldown() const;
 
 protected:
 	AP1CharacterBase* GetP1CharacterFromActorInfo() const;

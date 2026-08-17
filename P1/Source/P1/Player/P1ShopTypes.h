@@ -8,6 +8,7 @@
 
 class UTexture2D;
 class UGameplayEffect;
+class UGameplayAbility;
 
 // 상점 좌측 목록의 역할군 탭 — 아이템 하나가 여러 역할군에 걸칠 수 있어 FP1ShopItemData::Categories는 배열.
 UENUM(BlueprintType)
@@ -56,9 +57,18 @@ struct P1_API FP1ItemUniqueAbility
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop")
 	FText AbilityDescription;
 
-	// 이 고유 능력을 실제로 구현하는 GE — 구매 시 적용, 판매 시 제거(AP1PlayerState::ActiveItemEffects 참고).
+	// 조건 없이 즉시 적용되는(패시브 스탯/디버프 등) 고유 능력이면 이 GE를 구매 시 적용, 판매 시 제거
+	// (AP1PlayerState::ActiveItemEffects 참고). "기본 공격 적중 시에만 발동" 같은 반응형 고유 능력은
+	// 이 필드 대신 아래 TriggeredAbilityClass를 쓴다 — 둘 다 채울 필요는 없다(대부분 둘 중 하나만 사용).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop")
 	TSubclassOf<UGameplayEffect> EffectClass;
+
+	// 반응형(온-히트 등) 고유 능력이면 이 어빌리티를 구매 시 GiveAbility로 부여, 판매 시 ClearAbility로
+	// 회수한다(AP1PlayerState::ActiveItemAbilities 참고) — 어빌리티의 존재 자체가 "이 아이템을 갖고
+	// 있다"는 신호다. UP1GameplayAbility_OnHitItemAbility 파생 클래스가 이 용도의 표준 베이스
+	// (Event.Character.BasicAttackHitDealt 이벤트로 트리거, 크로노 스트라이크/매너스가 첫 사용처).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Shop")
+	TSubclassOf<UGameplayAbility> TriggeredAbilityClass;
 };
 
 // 상점 아이템 카탈로그 한 줄 — DT_ShopItems 같은 DataTable의 Row로 임포트한다(RowName=아이템 ID).

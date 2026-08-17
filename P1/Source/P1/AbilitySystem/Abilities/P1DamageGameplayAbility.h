@@ -52,6 +52,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Damage")
 	float SourceMaxHealthPctCoefficient = 0.0f;
 
+	// true면 ApplyDamageToTarget()이 Data.DamageType.Physical/Magical 대신 Data.DamageType.True를
+	// CapturedSourceTags에 부여한다 — P1ExecCalc_Damage가 이 태그를 보고 방어력 감산을 완전히 건너뛴다
+	// (관통과 무관한 별개 축, "고정 피해"). 증강(아이템) "진실의 일격"이 첫 사용처.
+	UPROPERTY(EditDefaultsOnly, Category = "Damage")
+	bool bIsTrueDamage = false;
+
 	// 시전자(어빌리티 아바타) 주변 반경 내 적을 찾는 공용 헬퍼 — 구 오버랩 + 같은 팀 제외 + 높이 필터만 수행.
 	// 전방 반원처럼 방향성 필터가 추가로 필요한 경우(MeleeAttack 등) 호출자가 반환된 목록에 덧씌운다.
 	TArray<AActor*> GetEnemiesInRadius(const FVector& Center, float Radius, float HalfHeight) const;

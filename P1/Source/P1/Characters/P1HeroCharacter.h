@@ -195,6 +195,13 @@ protected:
 	// 자동으로 영향을 받지 않는다. 서버 권위 전용 — OnStunTagChanged(NewCount>0)에서만 호출.
 	void CancelActiveAbilitiesOnStun();
 
+	// State.Immobilized(스턴/에어본/속박 등 "이동 불가"류 CC 전체를 아우르는 범용 카테고리 태그) 카운트
+	// 변경 — OnStunTagChanged와 별개 리스너다(스턴 전용 연출/취소 로직과 섞이지 않도록 관심사 분리).
+	// 0→양수 전이(서버) 시 Event.Character.Immobilized를 자신의 ASC로 보낸다 — 이동 불가에 반응하는
+	// 아이템 어빌리티(사면(아이템) "용기"가 첫 사용처)가 이 이벤트를 구독한다. 이 캐릭터 클래스는 어떤
+	// 아이템이 반응하는지 전혀 몰라도 된다(Event.Character.BasicAttackHitDealt와 동일한 범용 디스패치 원칙).
+	void OnImmobilizedTagChanged(FGameplayTag Tag, int32 NewCount);
+
 	// 진단용 — ASC->AbilityFailedCallbacks 구독. 클라이언트가 예측 활성화한 LocalPredicted 어빌리티가
 	// 서버의 authoritative 재검증에서 거부됐을 때 호출된다("홀드 중 어빌리티가 갑자기 끝남" 진단 포인트).
 	void OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason);

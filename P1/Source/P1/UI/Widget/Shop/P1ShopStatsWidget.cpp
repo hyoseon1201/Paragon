@@ -28,7 +28,10 @@ void UP1ShopStatsWidget::OnWidgetControllerSet()
 	BindStat(ASC, UP1AttributeSet::GetMaxManaAttribute(), MaxManaText, false);
 	BindStat(ASC, UP1AttributeSet::GetManaRegenAttribute(), ManaRegenText, false);
 	BindStat(ASC, UP1AttributeSet::GetAbilityHasteAttribute(), AbilityHasteText, false);
+	BindStat(ASC, UP1AttributeSet::GetUltimateHasteAttribute(), UltimateHasteText, false);
+	BindStat(ASC, UP1AttributeSet::GetUltimateDamagePercentAttribute(), UltimateDamagePercentText, true);
 	BindStat(ASC, UP1AttributeSet::GetTenacityAttribute(), TenacityText, true);
+	BindStat(ASC, UP1AttributeSet::GetDamageReductionAttribute(), DamageReductionText, true);
 	BindStat(ASC, UP1AttributeSet::GetCriticalChanceAttribute(), CriticalChanceText, true);
 	BindStat(ASC, UP1AttributeSet::GetCriticalDamageAttribute(), CriticalDamageText, true);
 }

@@ -192,6 +192,7 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 	{
 		TArray<FActiveGameplayEffectHandle> AppliedHandles;
+		TArray<FGameplayAbilitySpecHandle> GrantedAbilityHandles;
 
 		FGameplayEffectContextHandle EffectContext = ASC->MakeEffectContext();
 		EffectContext.AddSourceObject(this);
@@ -225,11 +226,24 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 				UE_LOG(LogP1, Warning, TEXT("[Shop]   UniqueAbility EffectClass 미설정 — %s | Ability=%s"),
 					*ItemRowName.ToString(), *Ability.AbilityName.ToString());
 			}
+
+			if (Ability.TriggeredAbilityClass)
+			{
+				const FGameplayAbilitySpecHandle Handle = ASC->GiveAbility(FGameplayAbilitySpec(Ability.TriggeredAbilityClass, 1));
+				UE_LOG(LogP1, Log, TEXT("[Shop]   UniqueAbility 어빌리티 부여 — %s | Ability=%s | Class=%s | 핸들유효=%d"),
+					*ItemRowName.ToString(), *Ability.AbilityName.ToString(), *Ability.TriggeredAbilityClass->GetName(), Handle.IsValid());
+				GrantedAbilityHandles.Add(Handle);
+			}
 		}
 
 		if (AppliedHandles.Num() > 0)
 		{
 			ActiveItemEffects.Add(ItemRowName, MoveTemp(AppliedHandles));
+		}
+
+		if (GrantedAbilityHandles.Num() > 0)
+		{
+			ActiveItemAbilities.Add(ItemRowName, MoveTemp(GrantedAbilityHandles));
 		}
 	}
 
@@ -268,6 +282,19 @@ void AP1PlayerState::ServerSellItem_Implementation(FName ItemRowName)
 			}
 		}
 		ActiveItemEffects.Remove(ItemRowName);
+	}
+
+	// 구매 시 부여한 온-히트 아이템 어빌리티들도 정확히 그 핸들들로만 회수.
+	if (TArray<FGameplayAbilitySpecHandle>* AbilityHandles = ActiveItemAbilities.Find(ItemRowName))
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+		{
+			for (const FGameplayAbilitySpecHandle& Handle : *AbilityHandles)
+			{
+				ASC->ClearAbility(Handle);
+			}
+		}
+		ActiveItemAbilities.Remove(ItemRowName);
 	}
 
 	static const FString ContextString(TEXT("ServerSellItem"));
