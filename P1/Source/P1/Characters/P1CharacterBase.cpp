@@ -8,6 +8,7 @@
 #include "Particles/ParticleSystemComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
@@ -82,6 +83,46 @@ void AP1CharacterBase::MulticastPlayNiagaraEffect_Implementation(UNiagaraSystem*
 	}
 
 	UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), NiagaraTemplate, GetActorLocation());
+}
+
+void AP1CharacterBase::MulticastSetAttachedNiagaraEffect_Implementation(UNiagaraSystem* NiagaraTemplate, FName SocketName)
+{
+	// 같은 소켓에 이미 재생 중인 지속 이펙트가 있다면 먼저 정리 — 중첩 재생 방지.
+	MulticastStopAttachedNiagaraEffect_Implementation(SocketName);
+
+	if (!NiagaraTemplate)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+	{
+		return;
+	}
+
+	// bAutoDestroy=false — MulticastPlayNiagaraEffect(1회성)와 달리 명시적으로 멈출 때까지 유지.
+	// 이펙트 에셋이 Looping으로 만들어져 있어도(지속 버프용 연출은 보통 루프) 자동으로 "완료" 상태에
+	// 도달하지 않으므로 반드시 여기서 명시적으로 파괴해야 사라진다.
+	if (!SocketName.IsNone() && MeshComp->DoesSocketExist(SocketName))
+	{
+		UNiagaraComponent* NewComp = UNiagaraFunctionLibrary::SpawnSystemAttached(NiagaraTemplate, MeshComp, SocketName,
+			FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, false);
+		AttachedNiagaraEffectComponents.Add(SocketName, NewComp);
+	}
+}
+
+void AP1CharacterBase::MulticastStopAttachedNiagaraEffect_Implementation(FName SocketName)
+{
+	if (TObjectPtr<UNiagaraComponent>* ExistingComp = AttachedNiagaraEffectComponents.Find(SocketName))
+	{
+		if (IsValid(*ExistingComp))
+		{
+			(*ExistingComp)->DeactivateImmediate();
+			(*ExistingComp)->DestroyComponent();
+		}
+		AttachedNiagaraEffectComponents.Remove(SocketName);
+	}
 }
 
 void AP1CharacterBase::MulticastPlayParticleEffectAtLocation_Implementation(UParticleSystem* ParticleTemplate, FVector Location, FRotator Rotation, FVector Scale)

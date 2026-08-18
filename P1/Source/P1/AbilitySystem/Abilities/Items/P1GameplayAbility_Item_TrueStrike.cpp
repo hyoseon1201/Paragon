@@ -24,6 +24,13 @@ void UP1GameplayAbility_Item_TrueStrike::OnGiveAbility(const FGameplayAbilityAct
 	{
 		ActorInfo->AbilitySystemComponent->AbilityActivatedCallbacks.AddUObject(
 			this, &UP1GameplayAbility_Item_TrueStrike::OnAnyAbilityActivated);
+
+		// 손 발광 이펙트의 시작/중지는 어빌리티 활성화 시점이 아니라 태그 그 자체를 구독해서 처리한다 —
+		// "부여"와 "소모"뿐 아니라 4초 자연만료도 전부 이 태그의 0<->양수 전이로 귀결되므로, 여기 한
+		// 곳에서만 반응하면 원인별로 따로 처리할 필요가 없다(Sacred Oath 검 발광과 동일한 이유).
+		ActorInfo->AbilitySystemComponent->RegisterGameplayTagEvent(
+			TAG_Buff_TrueStrike_Empowered, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &UP1GameplayAbility_Item_TrueStrike::OnEmpoweredTagChanged);
 	}
 }
 
@@ -70,12 +77,10 @@ void UP1GameplayAbility_Item_TrueStrike::OnAnyAbilityActivated(UGameplayAbility*
 
 	if (EmpowerBuffEffectClass)
 	{
+		// 태그 부여는 이 호출 안에서 동기적으로 처리되므로, ApplyEffectToSelf가 반환할 때쯤엔
+		// OnEmpoweredTagChanged(NewCount=1)이 이미 호출되어 손 발광 이펙트도 함께 시작돼 있다 —
+		// 여기서 별도로 이펙트 재생을 호출할 필요가 없다.
 		ApplyEffectToSelf(EmpowerBuffEffectClass);
-	}
-
-	if (AP1CharacterBase* Character = GetP1CharacterFromActorInfo())
-	{
-		Character->MulticastPlayNiagaraEffect(EmpowerEffect, EmpowerEffectSocketName);
 	}
 
 	if (const UGameplayEffect* CooldownGE = GetCooldownGameplayEffect())
@@ -107,4 +112,39 @@ void UP1GameplayAbility_Item_TrueStrike::OnBasicAttackHitDealt(AActor* Target, b
 
 	UE_LOG(LogP1, Log, TEXT("[TrueStrike] 강화된 기본공격 적중 — %s (크리티컬=%d)"),
 		Target ? *Target->GetName() : TEXT("null"), bWasCritical);
+}
+
+void UP1GameplayAbility_Item_TrueStrike::OnEmpoweredTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	AP1CharacterBase* Character = GetP1CharacterFromActorInfo();
+	if (!Character)
+	{
+		return;
+	}
+
+	// 양손 소켓 각각 독립적으로 시작/중지 — 소켓 이름이 실제로 지정된 쪽만 호출한다(둘 다 NAME_None이면
+	// 둘 다 스킵). 한쪽만 채워도 안전: 여기서 걸러내지 않으면 빈 소켓 이름이 MulticastSetAttachedNiagaraEffect
+	// 내부에서 "소켓 없음"으로 처리돼 재생 자체가 생략되므로 문제는 없지만, 애초에 빈 호출을 보내지 않는다.
+	if (NewCount > 0)
+	{
+		if (!EmpowerEffectSocketNameLeftHand.IsNone())
+		{
+			Character->MulticastSetAttachedNiagaraEffect(EmpowerEffect, EmpowerEffectSocketNameLeftHand);
+		}
+		if (!EmpowerEffectSocketNameRightHand.IsNone())
+		{
+			Character->MulticastSetAttachedNiagaraEffect(EmpowerEffect, EmpowerEffectSocketNameRightHand);
+		}
+	}
+	else
+	{
+		if (!EmpowerEffectSocketNameLeftHand.IsNone())
+		{
+			Character->MulticastStopAttachedNiagaraEffect(EmpowerEffectSocketNameLeftHand);
+		}
+		if (!EmpowerEffectSocketNameRightHand.IsNone())
+		{
+			Character->MulticastStopAttachedNiagaraEffect(EmpowerEffectSocketNameRightHand);
+		}
+	}
 }

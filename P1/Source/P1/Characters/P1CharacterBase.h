@@ -17,6 +17,7 @@ class UMaterialInterface;
 class UParticleSystem;
 class UParticleSystemComponent;
 class UNiagaraSystem;
+class UNiagaraComponent;
 
 UCLASS(Abstract)
 class P1_API AP1CharacterBase : public ACharacter, public IAbilitySystemInterface, public IGenericTeamAgentInterface
@@ -71,6 +72,21 @@ public:
 	// MulticastSetAttachedParticleEffect로 시작한 지속 이펙트를 중지(파괴)한다.
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastStopAttachedParticleEffect();
+
+	// 위 MulticastSetAttachedParticleEffect의 Niagara판 — 다만 슬롯 하나만 관리하는 원본과 달리
+	// SocketName을 키로 삼아 여러 소켓에 동시에 독립적인 지속 이펙트를 유지할 수 있다(증강(아이템)
+	// "진실의 일격"처럼 양손에 동시에 다른/같은 이펙트를 유지해야 하는 경우 대비). 같은 소켓에 이미
+	// 재생 중인 게 있으면 먼저 정리한 뒤 새로 시작한다. bAutoDestroy=false로 스폰하므로, 이펙트
+	// 에셋 자체가 무한 루프(Looping)로 만들어져 있어도 MulticastStopAttachedNiagaraEffect를
+	// 호출하기 전까지 확실히 유지되고, 호출하면 확실히 멈춘다 — 1회성 MulticastPlayNiagaraEffect를
+	// 지속 버프의 비주얼로 쓰면 루프 에셋이 "완료" 상태에 도달하지 못해 영원히 안 사라지는 문제가
+	// 생기므로, 버프 생명주기에 종속된 이펙트는 반드시 이쪽을 사용할 것.
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastSetAttachedNiagaraEffect(UNiagaraSystem* NiagaraTemplate, FName SocketName);
+
+	// MulticastSetAttachedNiagaraEffect로 시작한 지속 이펙트를 SocketName으로 찾아 중지(파괴)한다.
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastStopAttachedNiagaraEffect(FName SocketName);
 
 	// MulticastSetAttachedParticleEffect의 "소켓 부착" 대신 "고정 월드 좌표"에 지속 이펙트를 시작한다 —
 	// 캐릭터를 따라다니지 않고 확정된 지면 지점에 계속 남아있어야 하는 이펙트(예: Ion Strike 화살비)용.
@@ -132,4 +148,9 @@ protected:
 	// 활성화될 수 있음, 예: Q 회오리를 두르고 있는 동안 R 화살비도 같이 떨어지는 경우).
 	UPROPERTY()
 	TObjectPtr<UParticleSystemComponent> PersistentLocationParticleEffectComponent;
+
+	// MulticastSetAttachedNiagaraEffect로 시작한 지속 이펙트 인스턴스들 — 소켓 이름을 키로 관리해
+	// 여러 소켓(예: 양손)에 동시에 독립적으로 유지/중지할 수 있다.
+	UPROPERTY()
+	TMap<FName, TObjectPtr<UNiagaraComponent>> AttachedNiagaraEffectComponents;
 };

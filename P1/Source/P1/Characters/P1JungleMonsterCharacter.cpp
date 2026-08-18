@@ -15,6 +15,7 @@
 #include "AIController.h"
 #include "BrainComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "P1.h"
@@ -282,6 +283,15 @@ void AP1JungleMonsterCharacter::OnDiedEventReceived(const FGameplayEventData* Pa
 	if (!HasAuthority())
 	{
 		return;
+	}
+
+	// 콜리전을 가장 먼저 꺼서 사망 몽타주 재생 구간 동안 시체가 계속 얻어맞는 것 자체를 원천 차단 —
+	// GetEnemiesInRadius(UP1DamageGameplayAbility)가 ECC_Pawn 채널로 캡슐을 오버랩 스캔하는데, 이걸
+	// 안 끄면 이미 죽은 몬스터를 몽타주 재생 중에도 계속 때려서 히트리액트/넉백이 반복 적용돼 시체가
+	// 공중에 붕 뜬 채로 계속 얻어맞는 버그가 생긴다(실제 발견된 버그).
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
 	// BT/이동을 멈춰서 사망 몽타주 재생 구간 동안 시체가 계속 공격/추적하는 걸 방지.

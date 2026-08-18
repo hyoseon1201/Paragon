@@ -44,17 +44,33 @@ protected:
 	// 패시브/InputTag 없는 아이템 반응형 어빌리티)는 무시한다.
 	void OnAnyAbilityActivated(UGameplayAbility* ActivatedAbility);
 
+	// Buff.TrueStrike.Empowered 태그 0<->양수 전이 콜백 — 손 발광 이펙트의 시작/중지를 여기 한 곳에서만
+	// 처리한다("소모" 경로의 RemoveActiveEffectsWithGrantedTags든, 버프 GE가 4초 후 자연 만료되든 둘 다
+	// 결국 이 태그가 사라지는 것으로 귀결되므로, 원인과 무관하게 정확히 한 번만 반응할 수 있음 — Sacred
+	// Oath 검 발광에서 이미 검증된 패턴). MulticastSetAttachedNiagaraEffect/Stop을 쓰는 이유: 이 이펙트는
+	// 보통 Looping 에셋이라(지속 버프 연출), 1회성 MulticastPlayNiagaraEffect로 재생하면 "완료" 상태에
+	// 영영 도달하지 못해 버프가 끝나도 영구히 남아있는 버그가 생긴다.
+	void OnEmpoweredTagChanged(const FGameplayTag Tag, int32 NewCount);
+
 	// Buff.TrueStrike.Empowered를 부여하는 4초짜리 마커 버프(스탯 모디파이어 없음 — 태그만).
 	UPROPERTY(EditDefaultsOnly, Category = "TrueStrike")
 	TSubclassOf<UGameplayEffect> EmpowerBuffEffectClass;
 
-	// "부여" 순간(스킬 사용 감지, 강화 버프 시작) 1회 재생 — 미설정 시 재생 생략. "소모" 순간(강화된
-	// 기본공격 적중, 고정 피해 발동)과는 별개 이펙트라 각자 독립적으로 설정/생략 가능하다.
+	// Buff.TrueStrike.Empowered 태그가 붙어있는 동안(부여~소모 또는 4초 자연만료까지) 지속 재생 —
+	// 미설정 시 재생 생략. "소모" 순간(강화된 기본공격 적중, 고정 피해 발동)과는 별개 이펙트라 각자
+	// 독립적으로 설정/생략 가능하다. **양손에 동시 재생**(주문검류 연출 — 양손이 빛나는 느낌) —
+	// OnEmpoweredTagChanged가 소켓별로 MulticastSetAttachedNiagaraEffect/Stop을 호출한다(1회성
+	// MulticastPlayNiagaraEffect가 아님 — Looping 에셋을 1회성으로 재생하면 버프가 끝나도 이펙트가
+	// 영구히 안 사라지는 버그가 생기므로 반드시 지속형 함수를 사용). 소켓 이름은 스켈레톤마다 다르므로
+	// BP에서 지정 — 둘 중 하나만 채워도 그쪽만 재생되고, 둘 다 비우면(기본값 NAME_None) 재생 생략.
 	UPROPERTY(EditDefaultsOnly, Category = "TrueStrike|VFX")
 	TObjectPtr<UNiagaraSystem> EmpowerEffect;
 
 	UPROPERTY(EditDefaultsOnly, Category = "TrueStrike|VFX")
-	FName EmpowerEffectSocketName = NAME_None;
+	FName EmpowerEffectSocketNameLeftHand = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TrueStrike|VFX")
+	FName EmpowerEffectSocketNameRightHand = NAME_None;
 
 	// "소모" 순간(강화된 기본공격이 적중해 고정 피해가 들어가는 순간) 1회 재생 — 미설정 시 재생 생략.
 	UPROPERTY(EditDefaultsOnly, Category = "TrueStrike|VFX")
