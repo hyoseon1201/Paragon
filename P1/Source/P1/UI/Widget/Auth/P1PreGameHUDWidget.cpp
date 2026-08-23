@@ -90,7 +90,13 @@ void UP1PreGameHUDWidget::HandleMatchFound(FString ServerAddress)
 
 	if (APlayerController* PC = GetOwningPlayer())
 	{
-		PC->ClientTravel(ServerAddress, ETravelType::TRAVEL_Absolute);
+		// 선택한 히어로를 URL 옵션으로 실어 보낸다 — AP1ArenaGameMode::InitNewPlayer가 이 값을
+		// HeroTable에서 조회해 스폰 클래스를 결정한다(실제로 스폰을 좌우하는 건 이 경로뿐 — 백엔드
+		// 큐 참가 요청에 실은 heroId는 순수 기록용이라 여기로 되돌아오지 않음).
+		UP1BackendSubsystem* Backend = GetBackendSubsystem();
+		const FString HeroId = Backend ? Backend->GetSelectedHeroId().ToString() : FString();
+		const FString TravelURL = ServerAddress + TEXT("?HeroId=") + HeroId;
+		PC->ClientTravel(TravelURL, ETravelType::TRAVEL_Absolute);
 	}
 }
 

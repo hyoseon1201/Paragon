@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Player/P1PlayerController.h"
+#include "Player/P1BotArenaComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
@@ -10,6 +11,7 @@
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Characters/P1CharacterBase.h"
+#include "GameModes/P1GameState.h"
 #include "UI/P1DamageNumberActor.h"
 #include "UI/Widget/Scoreboard/P1ScoreboardWidget.h"
 #include "UI/WidgetController/P1ScoreboardWidgetController.h"
@@ -22,6 +24,7 @@
 AP1PlayerController::AP1PlayerController()
 {
 	PlayerCameraManagerClass = AP1PlayerCameraManager::StaticClass();
+	BotArenaComponent = CreateDefaultSubobject<UP1BotArenaComponent>(TEXT("BotArenaComponent"));
 }
 
 void AP1PlayerController::BeginPlay()
@@ -97,8 +100,19 @@ void AP1PlayerController::SetupInputComponent()
 	}
 }
 
+bool AP1PlayerController::IsMatchWaitingForPlayers() const
+{
+	const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
+	return P1GS && P1GS->GetMatchState() == EP1MatchState::WaitingForPlayers;
+}
+
 void AP1PlayerController::HandleMove(const FInputActionValue& Value)
 {
+	if (IsMatchWaitingForPlayers())
+	{
+		return;
+	}
+
 	ACharacter* ControlledCharacter = GetCharacter();
 	if (!IsValid(ControlledCharacter))
 	{
@@ -142,6 +156,11 @@ void AP1PlayerController::HandleLook(const FInputActionValue& Value)
 
 void AP1PlayerController::HandleJumpStarted(const FInputActionValue& Value)
 {
+	if (IsMatchWaitingForPlayers())
+	{
+		return;
+	}
+
 	ACharacter* ControlledCharacter = GetCharacter();
 	if (!ControlledCharacter)
 	{
@@ -306,6 +325,11 @@ void AP1PlayerController::ReturnToLobby(FString LobbyMapPath)
 
 void AP1PlayerController::HandleAbilityInputPressed(FGameplayTag InputTag)
 {
+	if (IsMatchWaitingForPlayers())
+	{
+		return;
+	}
+
 	UE_LOG(LogP1, Log, TEXT("[Input] AbilityInputPressed: %s"), *InputTag.ToString());
 
 	AP1CharacterBase* P1Character = GetPawn<AP1CharacterBase>();

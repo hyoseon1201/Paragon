@@ -13,6 +13,7 @@ struct FInputActionValue;
 class AP1DamageNumberActor;
 class UP1ScoreboardWidget;
 class UP1MatchResultWidget;
+class UP1BotArenaComponent;
 
 UCLASS()
 class P1_API AP1PlayerController : public APlayerController
@@ -22,9 +23,9 @@ class P1_API AP1PlayerController : public APlayerController
 public:
 	AP1PlayerController();
 
-	// 클라이언트가 접속 시 선택한 캐릭터 클래스.
-	// TODO: AP1ArenaGameMode::Login()에서 URL Options를 파싱해 설정.
-	//       현재는 null → GetDefaultPawnClassForController가 GameMode 기본값을 사용.
+	// 클라이언트가 PreGame에서 선택한 히어로의 Pawn 클래스 — AP1ArenaGameMode::InitNewPlayer가 접속
+	// URL의 "?HeroId=" 옵션을 HeroTable에서 조회해 채워준다. 비어있으면(옵션 없음/화이트리스트에 없는
+	// 값) GetDefaultPawnClassForController_Implementation이 GameMode 기본값으로 폴백한다.
 	UPROPERTY()
 	TSubclassOf<APawn> SelectedCharacterClass;
 
@@ -52,6 +53,13 @@ protected:
 	// 상점은 마우스로 클릭해야 하니 홀드가 아니라 토글(Started만 바인딩, 누를 때마다 열림↔닫힘 전환).
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> ShopAction;
+
+	// GameState->GetMatchState()==WaitingForPlayers인 동안 true — 매칭된 인원이 전부 접속하기 전까지는
+	// 먼저 들어온 클라이언트가 이동/전투로 유리해지지 않도록 HandleMove/HandleJumpStarted/
+	// HandleAbilityInputPressed 맨 앞에서 이 값을 체크해 조용히 무시한다. 지금은 순수 입력 무시뿐이고
+	// (캐릭터 자체는 이미 스폰돼 화면엔 보임), 나중에 이 상태 동안 로딩 화면 위젯을 띄우는 UI 작업이
+	// 별도로 붙을 예정.
+	bool IsMatchWaitingForPlayers() const;
 
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
@@ -116,4 +124,10 @@ private:
 	// 맵으로 개별 ClientTravel. IP:Port가 없는 순수 맵 경로이므로 각 클라이언트가 독립적으로 Arena
 	// 서버 접속을 끊고 로컬 레벨을 로드한다.
 	void ReturnToLobby(FString LobbyMapPath);
+
+	// 부하테스트용 헤드리스 봇 전용 — 실제 순찰/전투 로직은 전부 이 컴포넌트 안에 있다(이 클래스는
+	// 생성자에서 붙이기만 함). 커맨드라인에 "-BotId=N"이 없으면 컴포넌트가 스스로 아무 일도 안 하므로
+	// 일반 플레이어에게는 무관 — 자세한 내용은 P1BotArenaComponent.h 참고.
+	UPROPERTY(VisibleAnywhere, Category = "Bot")
+	TObjectPtr<UP1BotArenaComponent> BotArenaComponent;
 };

@@ -144,6 +144,14 @@ void AP1JungleMonsterCharacter::ApplyDefaultAttributes()
 		{
 			AttributeSet->SetHealth(AttributeSet->GetMaxHealth());
 		}
+
+		// 레벨별로 실제 스탯이 달라지는지 검증용 — DefaultAttributesEffectClass의 Modifier가 전부
+		// 고정값(Scalable Float 커브 없이 그냥 상수)이면 MonsterLevel이 몇이든 아래 수치가 똑같이
+		// 찍힌다(코드는 레벨을 스펙에 정확히 실어 보내고 있으므로, 그럴 경우 원인은 GE 에셋 쪽 — 커브를
+		// 안 넣었거나 레벨 축이 아닌 다른 축으로 잘못 설정된 것). 레벨에 따라 값이 실제로 달라지는지
+		// 이 로그로 직접 비교해서 확인할 것.
+		UE_LOG(LogP1, Log, TEXT("[JungleMonster] ApplyDefaultAttributes — Level=%d → MaxHealth=%.1f PhysicalPower=%.1f (%s)"),
+			MonsterLevel, AttributeSet ? AttributeSet->GetMaxHealth() : -1.0f, AttributeSet ? AttributeSet->GetPhysicalPower() : -1.0f, *GetName());
 	}
 }
 

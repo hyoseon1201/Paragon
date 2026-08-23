@@ -102,6 +102,17 @@ void UP1BackendSubsystem::JoinQueue()
 	}
 
 	const TSharedRef<IHttpRequest> Request = CreateRequest(TEXT("/api/match/queue"), TEXT("POST"), true);
+
+	// 지금 선택된 히어로를 매칭 신청에 함께 실어 보낸다 — 매칭 로직 자체는 아직 이 값을 안 쓰지만
+	// (누구와 매칭되는지는 히어로와 무관), 큐 참가 시점의 기록으로 백엔드에 남겨둔다.
+	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+	Body->SetStringField(TEXT("heroId"), SelectedHeroId.ToString());
+
+	FString BodyString;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&BodyString);
+	FJsonSerializer::Serialize(Body, Writer);
+	Request->SetContentAsString(BodyString);
+
 	Request->OnProcessRequestComplete().BindUObject(this, &UP1BackendSubsystem::OnQueueResponseReceived);
 	Request->ProcessRequest();
 }

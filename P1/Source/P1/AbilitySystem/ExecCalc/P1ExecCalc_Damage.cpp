@@ -111,9 +111,16 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 		+ TargetMaxHealthPctCoeff * TargetMaxHealth
 		+ SourceMaxHealthPctCoeff * SourceMaxHealth;
 
+	// 크리티컬은 기본공격에서만 발생해야 한다(스킬은 크리티컬 대상이 아님) — 기본공격 여부는
+	// CapturedSourceTags에 실린 Ability.BasicAttack 태그로 판별(ApplyDamageToTarget/ApplyComboHitDamage가
+	// 어빌리티의 Asset Tags를 스펙에 채워 넣는 경로, UP1DamageGameplayAbility 참고). 이 게이트가 없으면
+	// 스킬 데미지에도 CriticalChance/CriticalDamage가 그대로 굴러 크리티컬이 발생하는 버그가 생긴다
+	// (실제 발견된 버그) — Q/E/RMB/R 등 모든 스킬은 CriticalChance가 몇 %든 항상 크리티컬 불가.
+	const bool bIsBasicAttack = EvalParams.SourceTags && EvalParams.SourceTags->HasTag(TAG_Ability_BasicAttack);
+
 	// 크리티컬 판정 — ExecCalc는 서버(권한 보유 측)에서만 실행되므로 여기서 한 번만 굴려도 안전하다
 	// (클라이언트/서버가 각자 굴려서 어긋날 여지가 없음).
-	const bool bIsCriticalHit = FMath::FRand() < CriticalChance;
+	const bool bIsCriticalHit = bIsBasicAttack && (FMath::FRand() < CriticalChance);
 	const float CriticalMultiplier = bIsCriticalHit ? CriticalDamage : 1.0f;
 
 	const float PreMitigation = Raw * Multiplier * CriticalMultiplier;
@@ -131,9 +138,18 @@ void UP1ExecCalc_Damage::Execute_Implementation(const FGameplayEffectCustomExecu
 	// (방어력과는 별개 축이라는 게 이 스탯의 존재 이유, 사면(아이템) "용기" 참고).
 	const float FinalDamage = FMath::Max(0.0f, PreMitigation * PassThrough * (1.0f - DamageReduction));
 
-	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Crit=%d(%.0f%% 확률, %.2fx) | True=%d Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f DamageReduction=%.2f → Final=%.1f"),
+	// 누가(어떤 어빌리티로) 누구에게 얼마를 입혔는지 — 버그 검증용(예: 크리티컬이 기본공격에만 붙는지)으로
+	// 액터 이름+소스 태그(어느 어빌리티인지는 CapturedSourceTags에 실린 Ability.* 태그로 식별)를 함께 남긴다.
+	const AActor* SourceActor = ExecutionParams.GetSourceAbilitySystemComponent()
+		? ExecutionParams.GetSourceAbilitySystemComponent()->GetAvatarActor() : nullptr;
+	const AActor* TargetActor = ExecutionParams.GetTargetAbilitySystemComponent()
+		? ExecutionParams.GetTargetAbilitySystemComponent()->GetAvatarActor() : nullptr;
+	const FString SourceTagsStr = EvalParams.SourceTags ? EvalParams.SourceTags->ToStringSimple() : TEXT("(none)");
+
+	UE_LOG(LogP1, Log, TEXT("[ExecCalc_Damage] %s → %s | SourceTags=[%s] | Flat=%.1f PhysCoeff=%.2f Power=%.1f MagCoeff=%.2f MagPower=%.1f TargetMaxHPCoeff=%.2f TargetMaxHP=%.1f SourceMaxHPCoeff=%.2f SourceMaxHP=%.1f Mult=%.2f Raw=%.1f | Crit=%d(BasicAttack=%d, %.0f%% 확률, %.2fx) | True=%d Armor=%.1f Pen=%.1f EffArmor=%.1f PassThrough=%.2f DamageReduction=%.2f → Final=%.1f"),
+		SourceActor ? *SourceActor->GetName() : TEXT("null"), TargetActor ? *TargetActor->GetName() : TEXT("null"), *SourceTagsStr,
 		FlatDamage, PhysicalPowerCoeff, Power, MagicalPowerCoeff, MagicalPower, TargetMaxHealthPctCoeff, TargetMaxHealth,
-		SourceMaxHealthPctCoeff, SourceMaxHealth, Multiplier, Raw, bIsCriticalHit, CriticalChance * 100.0f, CriticalMultiplier,
+		SourceMaxHealthPctCoeff, SourceMaxHealth, Multiplier, Raw, bIsCriticalHit, bIsBasicAttack, CriticalChance * 100.0f, CriticalMultiplier,
 		bIsTrueDamage, Armor, Penetration, EffectiveArmor, PassThrough, DamageReduction, FinalDamage);
 
 	OutExecutionOutput.AddOutputModifier(

@@ -112,20 +112,10 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 		return;
 	}
 
-	const TArray<FGameplayAbilitySpec>& Specs = GetActivatableAbilities();
-	UE_LOG(LogP1, Log, TEXT("[ASC] AbilityInputTagPressed: %s | ActivatableAbilities count=%d"),
-		*InputTag.ToString(), Specs.Num());
-
 	bool bFoundMatch = false;
 	for (FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
 	{
-		const FGameplayTagContainer& DynTags = AbilitySpec.GetDynamicSpecSourceTags();
-		UE_LOG(LogP1, Log, TEXT("[ASC]   Spec: %s | DynamicTags=%s | IsActive=%d"),
-			AbilitySpec.Ability ? *AbilitySpec.Ability->GetName() : TEXT("null"),
-			*DynTags.ToString(),
-			AbilitySpec.IsActive() ? 1 : 0);
-
-		if (AbilitySpec.Ability && DynTags.HasTagExact(InputTag))
+		if (AbilitySpec.Ability && AbilitySpec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
 		{
 			bFoundMatch = true;
 			AbilitySpec.InputPressed = true;
@@ -142,9 +132,7 @@ void UP1AbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Input
 			}
 			else
 			{
-				const bool bActivated = TryActivateAbility(AbilitySpec.Handle);
-				UE_LOG(LogP1, Log, TEXT("[ASC]   TryActivateAbility result: %d (Ability=%s)"),
-					bActivated ? 1 : 0, *AbilitySpec.Ability->GetName());
+				TryActivateAbility(AbilitySpec.Handle);
 			}
 		}
 	}
@@ -219,17 +207,11 @@ void UP1AbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& Inpu
 	// 트리거라서(InputReleased() 오버라이드), 예전처럼 여기서 전부 삼키면 영원히 발사되지 않았다.
 	// 아래 루프는 원래도 "활성 중인 스펙과 태그가 일치하는 입력만" 전달하므로, 조준과 무관한 다른
 	// 어빌리티가 실수로 활성화될 위험은 없다(그건 AbilityInputTagPressed 쪽에서만 막으면 되는 문제).
-	UE_LOG(LogP1, Log, TEXT("[ASC] AbilityInputTagReleased: %s | IsOwnerActorAuthoritative=%d"),
-		*InputTag.ToString(), IsOwnerActorAuthoritative() ? 1 : 0);
-
 	for (FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
 	{
 		if (AbilitySpec.Ability && AbilitySpec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
 		{
 			AbilitySpec.InputPressed = false;
-
-			UE_LOG(LogP1, Log, TEXT("[ASC]   Release matched Spec: %s | IsActive=%d | bReplicateInputDirectly=%d"),
-				*AbilitySpec.Ability->GetName(), AbilitySpec.IsActive() ? 1 : 0, AbilitySpec.Ability->bReplicateInputDirectly ? 1 : 0);
 
 			if (AbilitySpec.IsActive())
 			{

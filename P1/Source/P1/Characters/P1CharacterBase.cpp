@@ -10,8 +10,10 @@
 #include "NiagaraSystem.h"
 #include "NiagaraComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "VFX/P1MovingParticleEffectActor.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Misc/App.h"
 #include "P1.h"
 
 AP1CharacterBase::AP1CharacterBase()
@@ -142,42 +144,23 @@ void AP1CharacterBase::MulticastPlayMovingParticleEffect_Implementation(UParticl
 		return;
 	}
 
-	// bAutoDestroy=false — 이펙트 자체의 내부 루프/지속시간과 무관하게, 이동이 끝나는 시점에 우리가
-	// 직접 정지+파괴한다(MulticastSetAttachedParticleEffect와 동일한 이유).
-	UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(
-		GetWorld(), ParticleTemplate, StartLocation, (EndLocation - StartLocation).Rotation(), FVector(1.0f), false);
-	if (!PSC)
+	// 이 함수는 NetMulticast라 서버 자신에게도 로컬로 실행된다 — 헤드리스 데디케이티드 서버와
+	// -nullrhi 헤드리스 봇 클라이언트에서는 렌더링할 화면 자체가 없으므로 애초에 스폰하지 않는다.
+	if (!FApp::CanEverRender() || (GetWorld() && GetWorld()->IsNetMode(NM_DedicatedServer)))
 	{
 		return;
 	}
 
-	// Start/End/Duration이 이 호출 하나로 결정적으로 정해지므로, 위치를 매 프레임 리플리케이트할 필요 없이
-	// 각 클라이언트가 독립적으로 로컬 타이머만으로 재생한다(0.02초 간격 — 위치 보간이 눈에 안 띄게 부드러운 수준).
-	const TWeakObjectPtr<UParticleSystemComponent> WeakPSC = PSC;
-	const double StartTime = GetWorld()->GetTimeSeconds();
-	const TSharedRef<FTimerHandle> MoveTimerHandle = MakeShared<FTimerHandle>();
-
-	FTimerDelegate MoveDelegate = FTimerDelegate::CreateWeakLambda(this,
-		[this, WeakPSC, StartLocation, EndLocation, StartTime, Duration, MoveTimerHandle]()
-		{
-			if (!WeakPSC.IsValid())
-			{
-				GetWorldTimerManager().ClearTimer(*MoveTimerHandle);
-				return;
-			}
-
-			const float Alpha = FMath::Clamp(static_cast<float>((GetWorld()->GetTimeSeconds() - StartTime) / Duration), 0.0f, 1.0f);
-			WeakPSC->SetWorldLocation(FMath::Lerp(StartLocation, EndLocation, Alpha));
-
-			if (Alpha >= 1.0f)
-			{
-				GetWorldTimerManager().ClearTimer(*MoveTimerHandle);
-				WeakPSC->DeactivateSystem();
-				WeakPSC->DestroyComponent();
-			}
-		});
-
-	GetWorldTimerManager().SetTimer(*MoveTimerHandle, MoveDelegate, 0.02f, true);
+	// TWeakObjectPtr+FTimerHandle+수동 Destroy() 조합으로 직접 구현했던 이전 버전은 세 차례
+	// 시도에도 정확한 원인 불명의 EXCEPTION_ACCESS_VIOLATION이 반복 재현됐다(오너 액터가
+	// IsValid() 체크는 통과하는데 몇 줄 뒤 Destroy() 호출 시점엔 죽어있는 패턴). 대신 이미
+	// 검증된 패턴(AP1DamageNumberActor와 동일한 Tick()+SetLifeSpan() — 커스텀 위크포인터/
+	// 타이머 관리가 전혀 없이 엔진이 전적으로 액터 수명을 관리)으로 갈아엎어 문제 자체를
+	// 없앴다 — 자세한 내용은 AP1MovingParticleEffectActor 헤더 주석 참고.
+	if (AP1MovingParticleEffectActor* Effect = GetWorld()->SpawnActor<AP1MovingParticleEffectActor>(StartLocation, (EndLocation - StartLocation).Rotation()))
+	{
+		Effect->InitializeMovingEffect(ParticleTemplate, StartLocation, EndLocation, Duration);
+	}
 }
 
 void AP1CharacterBase::MulticastDrawDebugSphere_Implementation(FVector Location, float Radius, FColor Color, float Duration)

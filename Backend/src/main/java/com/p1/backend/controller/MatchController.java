@@ -1,11 +1,13 @@
 package com.p1.backend.controller;
 
 import com.p1.backend.dto.MatchStatusResponse;
+import com.p1.backend.dto.QueueRequest;
 import com.p1.backend.interceptor.JwtAuthInterceptor;
 import com.p1.backend.service.MatchmakingService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -20,8 +22,9 @@ public class MatchController {
     }
 
     @PostMapping("/queue")
-    public MatchStatusResponse joinQueue(HttpServletRequest request) {
-        return matchmakingService.joinQueue(resolveEmail(request));
+    public MatchStatusResponse joinQueue(HttpServletRequest request, @RequestBody(required = false) QueueRequest body) {
+        String heroId = body != null ? body.heroId() : null;
+        return matchmakingService.joinQueue(resolveEmail(request), heroId);
     }
 
     @PostMapping("/leave")

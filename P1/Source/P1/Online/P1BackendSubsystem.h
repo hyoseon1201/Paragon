@@ -68,7 +68,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	bool IsLoggedIn() const { return !AuthToken.IsEmpty(); }
 
+	// PreGame 매칭 화면에 내장된 히어로 픽커(UP1HeroPickerWidget)가 호출 — 기본값 Greystone이라
+	// "미선택" 상태 자체가 없다. JoinQueue()가 이 값을 그대로 큐 참가 요청 바디에 실어 보낸다.
+	UFUNCTION(BlueprintCallable, Category = "Backend")
+	void SetSelectedHeroId(FName HeroId) { SelectedHeroId = HeroId; }
+
+	UFUNCTION(BlueprintCallable, Category = "Backend")
+	FName GetSelectedHeroId() const { return SelectedHeroId; }
+
 private:
+	// 순수 로컬 상태 — 백엔드 응답으로 되돌아오지 않는다(클라이언트가 이미 자기 선택을 알고 있으므로
+	// 되돌려줄 필요가 없음). Arena 서버로의 실제 전달은 ClientTravel URL 옵션(?HeroId=)이 전담한다
+	// (UP1PreGameHUDWidget::HandleMatchFound). 여기 저장된 값은 매칭 신청 시 백엔드 기록용으로만 쓰인다.
+	FName SelectedHeroId = FName(TEXT("Greystone"));
+
 	// 배포 시 재컴파일 없이 주소만 바꿀 수 있도록 DefaultGame.ini에서 읽는다.
 	// [/Script/P1.P1BackendSubsystem] BackendBaseUrl=http://127.0.0.1:8080
 	UPROPERTY(Config)

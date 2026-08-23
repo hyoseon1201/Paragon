@@ -8,9 +8,14 @@
 
 // 매치 진행 상태 — 종료 판정 자체(임계치 체크)는 AP1ArenaGameMode가 하고, 여기는 그 결과를
 // 복제해서 들고 있는 순수 데이터일 뿐이다(MatchStartServerTime과 같은 원칙).
+// WaitingForPlayers: 레벨은 로드됐지만 아직 필요 인원이 다 접속하지 않은 상태 — 이 동안은
+// MatchStartServerTime이 설정되지 않으므로(-1 유지) GetElapsedMatchTime()이 항상 0을 반환하고,
+// OnTeamKillScored()도 InProgress가 아니라는 이유로 킬을 무시한다 — 즉 먼저 접속한 플레이어가
+// 정글 캠프 레벨링(매치 경과 시간 기반) 등에서 유리해지는 걸 막는다.
 UENUM(BlueprintType)
 enum class EP1MatchState : uint8
 {
+	WaitingForPlayers,
 	InProgress,
 	Ended
 };
@@ -47,6 +52,10 @@ public:
 
 	void SetMatchEnded(int32 InWinningTeamId);
 
+	// 서버 전용 — AP1ArenaGameMode가 필요 인원이 전부 접속한 시점에 SetMatchStartTime()과 함께 호출해
+	// WaitingForPlayers→InProgress로 전환한다.
+	void SetMatchInProgress();
+
 	int32 GetTeamKillScore(int32 TeamId) const
 	{
 		return TeamKillScores.IsValidIndex(TeamId) ? TeamKillScores[TeamId] : 0;
@@ -79,7 +88,7 @@ private:
 	TArray<int32> TeamKillScores;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchState)
-	EP1MatchState MatchState = EP1MatchState::InProgress;
+	EP1MatchState MatchState = EP1MatchState::WaitingForPlayers;
 
 	// -1 = 아직 미정.
 	UPROPERTY(Replicated)

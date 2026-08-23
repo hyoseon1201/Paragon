@@ -2,10 +2,12 @@
 
 #include "GameModes/P1ArenaGameMode.h"
 #include "Characters/P1HeroCharacter.h"
+#include "Characters/P1HeroTypes.h"
 #include "GameModes/P1GameState.h"
 #include "Player/P1PlayerController.h"
 #include "Player/P1PlayerState.h"
 #include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "P1.h"
 
@@ -21,15 +23,49 @@ void AP1ArenaGameMode::BeginPlay()
 
 	if (AP1GameState* P1GS = GetGameState<AP1GameState>())
 	{
-		P1GS->SetMatchStartTime();
 		P1GS->InitializeTeamScores(NumTeams);
-		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 시작 시각 기록 — ServerWorldTime=%.2f, 팀 %d개 점수 초기화 (%s)"),
-			P1GS->GetServerWorldTimeSeconds(), NumTeams, *GetName());
+		UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 레벨 로드 — 팀 %d개 점수 초기화, %d명 접속 대기 중(WaitingForPlayers) (%s)"),
+			NumTeams, ExpectedPlayerCount, *GetName());
 	}
 	else
 	{
 		UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] BeginPlay — GetGameState<AP1GameState>()가 null, GameStateClass 설정 확인 필요"));
 	}
+}
+
+void AP1ArenaGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+
+	AP1GameState* P1GS = GetGameState<AP1GameState>();
+	if (!P1GS || P1GS->GetMatchState() != EP1MatchState::WaitingForPlayers)
+	{
+		return; // 이미 시작됐거나(InProgress/Ended) GameState가 없음 — 재시작 시도 불필요.
+	}
+
+	const int32 ConnectedCount = P1GS->PlayerArray.Num();
+	UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] PostLogin — %s 접속, %d/%d명"),
+		*NewPlayer->GetName(), ConnectedCount, ExpectedPlayerCount);
+
+	if (ConnectedCount >= ExpectedPlayerCount)
+	{
+		StartMatch();
+	}
+}
+
+void AP1ArenaGameMode::StartMatch()
+{
+	AP1GameState* P1GS = GetGameState<AP1GameState>();
+	if (!P1GS)
+	{
+		return;
+	}
+
+	P1GS->SetMatchStartTime();
+	P1GS->SetMatchInProgress();
+
+	UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] 매치 시작 — 전원 접속 완료, ServerWorldTime=%.2f 기준으로 클럭 0초 고정 (%s)"),
+		P1GS->GetServerWorldTimeSeconds(), *GetName());
 }
 
 void AP1ArenaGameMode::OnTeamKillScored(int32 TeamId)
@@ -133,4 +169,43 @@ UClass* AP1ArenaGameMode::GetDefaultPawnClassForController_Implementation(AContr
 
 	// SelectedCharacterClass가 설정되지 않은 경우 BP_P1ArenaGameMode에 지정된 DefaultPawnClass 사용.
 	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
+FString AP1ArenaGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
+	const FString& Options, const FString& Portal)
+{
+	const FString ErrorMessage = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return ErrorMessage;
+	}
+
+	AP1PlayerController* P1PC = Cast<AP1PlayerController>(NewPlayerController);
+	if (!P1PC || !HeroTable)
+	{
+		return ErrorMessage;
+	}
+
+	const FString HeroIdOption = UGameplayStatics::ParseOption(Options, TEXT("HeroId"));
+	if (HeroIdOption.IsEmpty())
+	{
+		UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] InitNewPlayer — URL에 HeroId 옵션이 없음 (%s), 기본 스폰 클래스로 폴백"),
+			*NewPlayerController->GetName());
+		return ErrorMessage;
+	}
+
+	const FP1HeroDefinition* Row = HeroTable->FindRow<FP1HeroDefinition>(FName(*HeroIdOption), TEXT("AP1ArenaGameMode::InitNewPlayer"));
+	if (!Row || !Row->HeroClass)
+	{
+		// HeroTable에 없는(조작되었거나 오래된) HeroId — 화이트리스트에 없는 값이므로 조용히 무시하고
+		// GetDefaultPawnClassForController_Implementation의 기존 폴백(GameMode DefaultPawnClass)에 맡긴다.
+		UE_LOG(LogP1, Warning, TEXT("[ArenaGameMode] InitNewPlayer — HeroTable에 없는 HeroId='%s' (%s), 기본 스폰 클래스로 폴백"),
+			*HeroIdOption, *NewPlayerController->GetName());
+		return ErrorMessage;
+	}
+
+	P1PC->SelectedCharacterClass = Row->HeroClass;
+	UE_LOG(LogP1, Log, TEXT("[ArenaGameMode] InitNewPlayer — HeroId='%s' → %s (%s)"),
+		*HeroIdOption, *Row->HeroClass->GetName(), *NewPlayerController->GetName());
+	return ErrorMessage;
 }

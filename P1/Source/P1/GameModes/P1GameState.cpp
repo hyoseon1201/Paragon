@@ -43,6 +43,16 @@ void AP1GameState::SetMatchEnded(int32 InWinningTeamId)
 	WinningTeamId = InWinningTeamId;
 }
 
+void AP1GameState::SetMatchInProgress()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	MatchState = EP1MatchState::InProgress;
+}
+
 void AP1GameState::OnRep_MatchState()
 {
 	UE_LOG(LogP1, Log, TEXT("[GameState] OnRep_MatchState — MatchState=%d WinningTeamId=%d"),

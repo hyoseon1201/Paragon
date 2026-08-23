@@ -4,7 +4,6 @@
 #include "Components/SphereComponent.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Characters/P1CharacterBase.h"
-#include "AbilitySystem/P1GameplayTags.h"
 #include "Engine/OverlapResult.h"
 #include "DrawDebugHelpers.h"
 #include "P1.h"
@@ -83,12 +82,11 @@ bool AP1ContainmentFence::IsBlockableEnemy(const AActor* TargetActor) const
 		return false;
 	}
 
-	// 튜닝된 대상은 "적 히어로"만(원 문구 그대로) — 몬스터/보스는 대상이 아니다.
-	if (Character->GetCharacterType() != TAG_Character_Type_Hero)
-	{
-		return false;
-	}
-
+	// 적 히어로뿐 아니라 정글 몬스터도 막는다(2026-08-19 확정 — 원작 툴팁 문구엔 "적 히어로"뿐이었지만,
+	// 이 프로젝트에서는 정글 몹도 감금/차단 대상으로 취급하기로 함) — 그래서 CharacterType 자체는
+	// 더 이상 걸러내지 않고, 팀 판별만으로 대상 여부를 결정한다. 정글 몬스터는 TeamId=255(NoTeam)라
+	// AP1CharacterBase::IsSameTeam()이 항상 false를 반환하므로(255는 절대 "같은 팀"으로 안 침) 자연히
+	// "적"으로 취급돼 아래 팀 체크만으로 올바르게 걸러진다.
 	if (!FenceInstigator.IsValid() || AP1CharacterBase::IsSameTeam(FenceInstigator.Get(), Character))
 	{
 		return false;

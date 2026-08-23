@@ -9,6 +9,7 @@
 class UButton;
 class UTextBlock;
 class UP1BackendSubsystem;
+class UP1HeroPickerWidget;
 
 // PreGame 매칭 대기 화면 전용 위젯. QueueButton 하나로 "매칭 시작"/"취소" 두 상태를 겸한다 —
 // 대기 중이 아니면 클릭 시 JoinQueue(), 대기 중이면 클릭 시 LeaveQueue(). 대기 상태 표시(공용 상태
@@ -30,6 +31,10 @@ protected:
 	// "매칭 시작"/"취소" 라벨 전환이 가능하다.
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> QueueButtonLabel;
+
+	// 매칭 화면에 내장된 히어로 픽커 — 대기 중엔 SetQueuedState()가 잠근다(아래 참고).
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UP1HeroPickerWidget> HeroPickerWidget;
 
 private:
 	UFUNCTION()

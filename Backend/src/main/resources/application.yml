@@ -23,5 +23,5 @@ jwt:
   expiration-ms: 3600000 # 1시간
 
 match:
-  required-players: 2
+  required-players: 9
   server-address: "127.0.0.1:7777"

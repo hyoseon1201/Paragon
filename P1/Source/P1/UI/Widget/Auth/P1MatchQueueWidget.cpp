@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "UI/Widget/Auth/P1MatchQueueWidget.h"
+#include "UI/Widget/Auth/P1HeroPickerWidget.h"
 #include "Online/P1BackendSubsystem.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -70,5 +71,12 @@ void UP1MatchQueueWidget::SetQueuedState(bool bInIsQueued)
 	if (QueueButtonLabel)
 	{
 		QueueButtonLabel->SetText(FText::FromString(bIsQueued ? TEXT("취소") : TEXT("매칭 시작")));
+	}
+
+	// 대기 중엔 히어로를 못 바꾸게 잠근다 — 이미 신청한 큐 요청에 실린 heroId와 어긋나지 않도록.
+	// (이미 구현돼 있던 부분 — HeroPickerWidget->SetLocked()가 컨테이너 전체를 비활성화)
+	if (HeroPickerWidget)
+	{
+		HeroPickerWidget->SetLocked(bIsQueued);
 	}
 }

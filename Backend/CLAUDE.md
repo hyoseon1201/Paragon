@@ -53,8 +53,8 @@ com.p1.backend
 | `service/AuthService` (signup/login) | 완료 | jBCrypt 해싱/검증. `signup(email, username, rawPassword)`은 `existsByEmail`로 중복 체크(`EmailTakenException`), `login(email, rawPassword)`은 `findByEmail`로 조회 |
 | `controller/AuthController` | 완료 | `POST /api/auth/signup`(body: `{email, username, password}`, 201/409 `EMAIL_TAKEN`), `POST /api/auth/login`(body: `{email, password}`, 200/401) |
 | `interceptor/JwtAuthInterceptor` + `config/WebConfig` | 완료 | `/api/match/**`만 보호, `Authorization: Bearer <token>` 검증 → 검증된 email을 `AUTHENTICATED_EMAIL_ATTRIBUTE` request attribute에 저장(예전엔 username이었음) |
-| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(현재 2) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정. 큐/매칭 식별자는 email(예전엔 username이었으나 유일성이 깨져서 email로 교체, 내부 변수명도 `queuedEmails`로 변경). `joinQueue()`/`leaveQueue()` 둘 다 `synchronized`(같은 인스턴스 락 공유)라 동시 요청도 순차적으로 처리됨 — curl로 검증(대기 중이던 1명에 2명이 거의 동시에 합류해도 먼저 락을 잡은 쪽이 매칭되고 나머지는 대기). `leaveQueue()`는 이미 매칭된 유저에겐 취소를 거부하고 그대로 MATCHED를 반환(레이스 컨디션 방지) — 이것도 curl로 검증됨 |
-| `controller/MatchController` | 완료 | `POST /api/match/queue`, `POST /api/match/leave`, `GET /api/match/status` |
+| `service/MatchmakingService` | 완료 | 인메모리 큐, `match.required-players`(2026-08-20에 6으로, 2026-08-21에 9로 조정 — 헤드리스 봇 하네스 규모 확대(봇 8+실플레이어 1)에 맞춤, `application.yml`) 도달 시 즉시 페어링, `match.server-address`(고정값) 배정. 큐/매칭 식별자는 email(예전엔 username이었으나 유일성이 깨져서 email로 교체, 내부 변수명도 `queuedEmails`로 변경). `joinQueue()`/`leaveQueue()` 둘 다 `synchronized`(같은 인스턴스 락 공유)라 동시 요청도 순차적으로 처리됨 — curl로 검증(대기 중이던 1명에 2명이 거의 동시에 합류해도 먼저 락을 잡은 쪽이 매칭되고 나머지는 대기). `leaveQueue()`는 이미 매칭된 유저에겐 취소를 거부하고 그대로 MATCHED를 반환(레이스 컨디션 방지) — 이것도 curl로 검증됨. **`emailToHeroId`(신규, 2026-08-18)**: `ConcurrentHashMap<String, String>`, `queuedEmails`와 정확히 같은 시점(`joinQueue`/`leaveQueue`/`tryFormMatch`의 매칭 소비)에 채워지고 비워짐 — 언리얼 클라이언트(PreGame 매칭 화면에 내장된 히어로 픽커)가 큐 참가 시 함께 보낸 `heroId`를 기록만 해둔다. **매칭 로직(`tryFormMatch`)은 이 값을 전혀 참조하지 않는다** — 누구와 매칭되는지는 여전히 히어로와 무관, 순수 플러밍. `joinQueue()` 진입 시 `log.info("매칭 신청 — email={}, heroId={}", ...)`(SLF4J, 이 프로젝트 첫 로깅 사용처)로 어떤 계정이 어떤 히어로로 신청했는지 매 호출마다 기록 |
+| `controller/MatchController` | 완료 | `POST /api/match/queue`(body: `{heroId}`, `QueueRequest`, `@RequestBody(required = false)`라 바디 없는 요청도 허용), `POST /api/match/leave`, `GET /api/match/status` |
 | 컴파일 검증 | 완료 | `./mvnw compile` 성공 |
 | MySQL 기동 후 curl 엔드투엔드 검증 | 완료 | signup×2→login×2→queue×2(WAITING→MATCHED, 대기 중이던 유저도 재조회 시 MATCHED)+에러 경로(409/401/401) 확인. 이후 `leaveQueue` 추가분도 별도 검증: 혼자 참가 후 이탈→NOT_QUEUED, 매칭 성사 후 이탈 시도→취소 거부되고 MATCHED 유지 |
 | 언리얼 PreGame 연동 (HTTP 클라이언트, 로그인/큐 UI) | 미완료 | `P1/` 저장소 쪽 작업, 별도 진행 중 |
@@ -63,4 +63,5 @@ com.p1.backend
 
 - 사용자가 MySQL(Docker) 기동 후 curl/Postman으로 회원가입→로그인→매칭 흐름 직접 검증
 - 언리얼 클라이언트(`UP1BackendSubsystem`)와 실제 연동 테스트
+- **`heroId` 큐 참가 플러밍(2026-08-18, 컴파일만 확인됨, curl/PIE 미검증)** — `POST /api/match/queue`에 `{"heroId":"Dekker"}` 같은 바디를 보내 200이 오는지, `emailToHeroId`에 실제로 기록되는지 확인 필요(응답 바디엔 안 나오므로 임시 로그로 확인하거나 디버거로 확인)
 - (이후) Redis 기반 분산 매치메이킹, 실제 데디케이티드 서버 동적 프로비저닝, 회원 정보 확장(레벨/전적 연동 등)은 MVP 이후 범위

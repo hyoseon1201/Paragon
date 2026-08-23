@@ -2,6 +2,8 @@ package com.p1.backend.service;
 
 import com.p1.backend.dto.MatchStatus;
 import com.p1.backend.dto.MatchStatusResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Service
 public class MatchmakingService {
 
+    private static final Logger log = LoggerFactory.getLogger(MatchmakingService.class);
+
     private final int requiredPlayers;
     private final String serverAddress;
 
@@ -30,13 +34,20 @@ public class MatchmakingService {
     // 매칭 완료된 유저 → 배정된 서버 주소. /status 폴링이 여기서 결과를 읽어간다.
     private final ConcurrentHashMap<String, String> matchedUsers = new ConcurrentHashMap<>();
 
+    // email → 큐 참가 시점에 선택했던 heroId. 매칭 로직(tryFormMatch)은 이 값을 전혀 참조하지 않는다 —
+    // 지금은 순수 기록용(향후 팀 구성/분석 등에 재사용 가능하도록 플러밍만 해둔 것). queuedEmails와
+    // 정확히 같은 시점에 채워지고 비워진다.
+    private final ConcurrentHashMap<String, String> emailToHeroId = new ConcurrentHashMap<>();
+
     public MatchmakingService(@Value("${match.required-players}") int requiredPlayers,
                                @Value("${match.server-address}") String serverAddress) {
         this.requiredPlayers = requiredPlayers;
         this.serverAddress = serverAddress;
     }
 
-    public synchronized MatchStatusResponse joinQueue(String email) {
+    public synchronized MatchStatusResponse joinQueue(String email, String heroId) {
+        log.info("매칭 신청 — email={}, heroId={}", email, heroId != null ? heroId : "Greystone");
+
         // remove(): 매칭 결과는 클라이언트에게 한 번 전달되면 소비된다. get()으로 남겨두면
         // 예전에 매칭됐던 유저가 재접속 후 다시 큐에 들어갈 때 대기열 인원 체크 없이
         // 즉시 MATCHED가 재반환되는 버그가 생긴다(실제로 발생했던 문제).
@@ -47,6 +58,7 @@ public class MatchmakingService {
 
         if (queuedEmails.add(email)) {
             queue.add(email);
+            emailToHeroId.put(email, heroId != null ? heroId : "Greystone");
         }
 
         tryFormMatch();
@@ -68,6 +80,7 @@ public class MatchmakingService {
 
         if (queuedEmails.remove(email)) {
             queue.remove(email);
+            emailToHeroId.remove(email);
         }
 
         return new MatchStatusResponse(MatchStatus.NOT_QUEUED, null);
@@ -97,6 +110,7 @@ public class MatchmakingService {
             }
             for (String member : group) {
                 matchedUsers.put(member, serverAddress);
+                emailToHeroId.remove(member);
             }
         }
     }
