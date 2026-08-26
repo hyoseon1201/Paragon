@@ -34,6 +34,7 @@ void AP1PlayerState::SetGenericTeamId(const FGenericTeamId& NewTeamId)
 	if (HasAuthority())
 	{
 		MyTeamId = NewTeamId;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, MyTeamId, this);
 	}
 }
 
@@ -51,6 +52,7 @@ void AP1PlayerState::SetCharacterLevel(int32 NewLevel)
 	if (HasAuthority())
 	{
 		CharacterLevel = FMath::Max(1, NewLevel);
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, CharacterLevel, this);
 		OnCharacterLevelChangedNative.Broadcast(CharacterLevel);
 	}
 }
@@ -60,6 +62,7 @@ void AP1PlayerState::SetStunEndServerTime(float NewEndServerTime)
 	if (HasAuthority())
 	{
 		StunEndServerTime = NewEndServerTime;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, StunEndServerTime, this);
 		// 서버(리슨서버/호스트)에선 OnRep이 안 불리므로 여기서 직접 브로드캐스트 — CharacterLevel 등과 동일 패턴.
 		OnStunTimeChangedNative.Broadcast();
 	}
@@ -81,16 +84,22 @@ void AP1PlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AP1PlayerState, MyTeamId);
-	DOREPLIFETIME(AP1PlayerState, HeroDisplayName);
-	DOREPLIFETIME(AP1PlayerState, CharacterLevel);
-	DOREPLIFETIME(AP1PlayerState, SkillPoints);
-	DOREPLIFETIME(AP1PlayerState, Kills);
-	DOREPLIFETIME(AP1PlayerState, Deaths);
-	DOREPLIFETIME(AP1PlayerState, Assists);
-	DOREPLIFETIME(AP1PlayerState, KillStreak);
-	DOREPLIFETIME(AP1PlayerState, StunEndServerTime);
-	DOREPLIFETIME(AP1PlayerState, Inventory);
+	// 엔진 베이스 APlayerState::GetLifetimeReplicatedProps()(Score 등)와 동일한 패턴 — 매 넷업데이트마다
+	// 무조건 비교하는 대신, Setter 쪽에서 MARK_PROPERTY_DIRTY_FROM_NAME으로 명시적으로 신고된 프로퍼티만
+	// 비교/직렬화한다(Push Model). 여기 등록된 10개는 전부 그에 맞춰 각 Setter/변경 지점에 마킹을 추가해둠.
+	FDoRepLifetimeParams SharedParams;
+	SharedParams.bIsPushBased = true;
+
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, MyTeamId, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, HeroDisplayName, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, CharacterLevel, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, SkillPoints, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, Kills, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, Deaths, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, Assists, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, KillStreak, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, StunEndServerTime, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1PlayerState, Inventory, SharedParams);
 }
 
 void AP1PlayerState::ApplyGoldDelta(float Delta)
@@ -185,6 +194,7 @@ void AP1PlayerState::ServerBuyItem_Implementation(FName ItemRowName)
 
 	ApplyGoldDelta(-static_cast<float>(ItemData->Price));
 	Inventory.Add(ItemRowName);
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Inventory, this);
 	OnInventoryChangedNative.Broadcast();
 
 	// 깡스탯 GE + 고유 능력 GE들을 전부 적용 — 다들 Infinite Duration이라 핸들을 들고 있다가 판매 시
@@ -269,6 +279,7 @@ void AP1PlayerState::ServerSellItem_Implementation(FName ItemRowName)
 		UE_LOG(LogP1, Warning, TEXT("[Shop] ServerSellItem: 보유하지 않은 아이템 — %s"), *ItemRowName.ToString());
 		return;
 	}
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Inventory, this);
 
 	// 구매 시 걸어둔 깡스탯+고유 능력 GE들을 정확히 그 핸들들로만 제거 — 같은 아이템 중복 보유가
 	// 금지돼 있어 FName 하나당 핸들 목록 하나로 항상 안전하게 매칭된다.

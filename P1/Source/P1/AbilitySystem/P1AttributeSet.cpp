@@ -55,36 +55,44 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Health, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Mana, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MaxMana, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, HealthRegen, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, ManaRegen, COND_None, REPNOTIFY_Always);
+	// GAS 자체(FGameplayAttribute::SetNumericValueChecked 등, GAMEPLAYATTRIBUTE_* 매크로 경로)가 어트리뷰트
+	// 값을 바꿀 때마다 이미 내부적으로 MARK_PROPERTY_DIRTY를 호출해준다 — 여기서는 등록만 push-based로
+	// 바꾸면 되고, 우리 쪽에서 별도로 마킹 코드를 추가할 필요가 없다.
+	FDoRepLifetimeParams SharedParams;
+	SharedParams.Condition = COND_None;
+	SharedParams.RepNotifyCondition = REPNOTIFY_Always;
+	SharedParams.bIsPushBased = true;
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, PhysicalPower, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MagicalPower, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AttackSpeed, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, BasicAttackTime, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AttackRange, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Cleave, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, PhysicalArmor, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MagicalArmor, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, PhysicalPenetration, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MagicalPenetration, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, LifeSteal, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Tenacity, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, DamageReduction, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, AbilityHaste, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, UltimateHaste, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, UltimateDamagePercent, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalChance, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, CriticalDamage, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Health, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxHealth, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Mana, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxMana, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, HealthRegen, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, ManaRegen, SharedParams);
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, MovementSpeed, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, PhysicalPower, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MagicalPower, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, AttackSpeed, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, BasicAttackTime, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, AttackRange, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Cleave, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, PhysicalArmor, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MagicalArmor, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, PhysicalPenetration, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MagicalPenetration, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, LifeSteal, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Tenacity, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, DamageReduction, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, AbilityHaste, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, UltimateHaste, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, UltimateDamagePercent, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, CriticalChance, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, CriticalDamage, SharedParams);
 
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Gold, COND_None, REPNOTIFY_Always);
-	DOREPLIFETIME_CONDITION_NOTIFY(UP1AttributeSet, Experience, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MovementSpeed, SharedParams);
+
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Gold, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Experience, SharedParams);
 }
 
 void UP1AttributeSet::ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const

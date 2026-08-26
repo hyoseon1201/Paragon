@@ -70,6 +70,14 @@ protected:
 private:
 	void BotTick();
 
+	// 팀마다 순찰 시작 캠프를 다르게 흩어놓는다(같은 캠프에 전 팀이 몰려있으면 서로 항상 가까워서
+	// NetCullDistanceSquared 거리 컬링이 실측 테스트에서 거의 안 걸리는 문제가 있었음, 2026-08-26).
+	// PlayerState->GetGenericTeamId()가 BeginPlay 시점엔 아직 미배정(NoTeam=255)일 수 있어서(팀 배정은
+	// AP1ArenaGameMode::ChoosePlayerStart_Implementation에서 이뤄지는데, 그게 이 컴포넌트의 BeginPlay보다
+	// 먼저 끝난다는 보장이 없음) BotTick 첫 실행 시점에 지연 적용하고, 아직도 미배정이면 다음 틱에 재시도한다.
+	void ApplyTeamPatrolOffsetIfReady();
+	bool bPatrolStartOffsetApplied = false;
+
 	// PatrolLocations[CurrentPatrolIndex]까지 내비메시 경로를 계산해 CurrentPathPoints에 채운다
 	// (실패 시 직선 목표 하나짜리 경로로 폴백). CurrentPathPoints가 비어있을 때 TickComponent()가
 	// 호출한다 — BeginPlay 시점엔 아직 캐릭터가 스폰 전이라 여기서 미리 계산해둘 수 없다.

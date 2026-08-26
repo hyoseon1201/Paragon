@@ -7,6 +7,8 @@
 #include "Characters/P1CharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameModes/P1GameState.h"
+#include "Player/P1PlayerState.h"
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "NavigationPath.h"
@@ -149,8 +151,45 @@ void UP1BotArenaComponent::RequestPathToCurrentTarget(AP1CharacterBase* Characte
 	}
 }
 
+void UP1BotArenaComponent::ApplyTeamPatrolOffsetIfReady()
+{
+	if (bPatrolStartOffsetApplied || PatrolLocations.IsEmpty())
+	{
+		return;
+	}
+
+	const APlayerController* PC = GetOwner<APlayerController>();
+	const AP1PlayerState* P1PS = PC ? Cast<AP1PlayerState>(PC->PlayerState) : nullptr;
+	if (!P1PS)
+	{
+		return; // PlayerState가 아직 안 붙었음 — 다음 BotTick에서 재시도.
+	}
+
+	const uint8 TeamId = P1PS->GetGenericTeamId().GetId();
+	if (TeamId == 255) // FGenericTeamId::NoTeam — 팀 배정 전, 다음 BotTick에서 재시도.
+	{
+		return;
+	}
+
+	const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
+	const int32 NumTeams = P1GS ? P1GS->GetNumTeams() : 0;
+	if (NumTeams > 0)
+	{
+		// 팀마다 캠프 목록을 균등하게 나눠 서로 다른 지점에서 순찰을 시작 — 같은 캠프에 몰리지 않고
+		// 흩어지게 해서, 팀 간 거리가 자연스럽게 벌어져 히어로 NetCullDistanceSquared 컬링이 실제로
+		// 걸릴 기회를 만든다. 순서 자체(다음 캠프로 넘어가는 방향)는 그대로 두고 시작점만 다르게 한다.
+		CurrentPatrolIndex = (TeamId * PatrolLocations.Num()) / NumTeams;
+	}
+
+	bPatrolStartOffsetApplied = true;
+	UE_LOG(LogP1, Log, TEXT("[Bot] 팀 기준 순찰 시작 캠프 배정 — Team=%d, StartIndex=%d/%d (%s)"),
+		TeamId, CurrentPatrolIndex, PatrolLocations.Num(), *GetOwner()->GetName());
+}
+
 void UP1BotArenaComponent::BotTick()
 {
+	ApplyTeamPatrolOffsetIfReady();
+
 	APlayerController* PC = GetOwner<APlayerController>();
 	AP1CharacterBase* Character = PC ? Cast<AP1CharacterBase>(PC->GetCharacter()) : nullptr;
 

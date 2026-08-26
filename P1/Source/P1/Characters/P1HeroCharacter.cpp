@@ -27,6 +27,15 @@
 
 AP1HeroCharacter::AP1HeroCharacter()
 {
+	// 기본 NetCullDistanceSquared(150m)를 넘어가면 이 캐릭터가 먼 클라이언트에서 아예 리플리케이트
+	// 안 돼(GetPawn()이 그 클라에서만 nullptr) 미니맵 아군 아이콘이 사라지는 버그가 있었다(실제 발견된
+	// 버그). 처음엔 bAlwaysRelevant=true로 거리 컬링을 아예 꺼서 고쳤는데, 이러면 적까지 항상 전원에게
+	// 리플리케이트돼(2026-08-25, Insights로 GameNetDriver 리플리케이션 비용에서 큰 비중 확인) 정글
+	// 몬스터에 적용한 거리 컬링의 이점을 적에게는 전혀 못 받는 문제가 있었다 — 그래서 bAlwaysRelevant
+	// 대신 아래 IsNetRelevantFor() 오버라이드로 "아군은 항상, 적은 거리 컬링"을 팀 기준으로 분기한다.
+	// 정글 몬스터와 동일하게 6000으로 되돌림(위 P1JungleMonsterCharacter 주석 참고).
+	SetNetCullDistanceSquared(6000.0f * 6000.0f);
+
 	bUseControllerRotationYaw = true;
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationRoll = false;
@@ -45,6 +54,22 @@ FGenericTeamId AP1HeroCharacter::GetGenericTeamId() const
 {
 	const AP1PlayerState* P1PS = GetPlayerState<AP1PlayerState>();
 	return P1PS ? P1PS->GetGenericTeamId() : FGenericTeamId::NoTeam;
+}
+
+bool AP1HeroCharacter::IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget, const FVector& SrcLocation) const
+{
+	// FNetViewer::InViewer는 커넥션의 PlayerController다(NetDriver.cpp) — 그 PlayerState로 팀을 비교한다.
+	// PlayerController 자신은 IGenericTeamAgentInterface를 구현하지 않아 RealViewer를 직접 IsSameTeam에
+	// 넘기면 항상 실패한다.
+	if (const APlayerController* ViewerPC = Cast<APlayerController>(RealViewer))
+	{
+		if (IsSameTeam(this, ViewerPC->PlayerState))
+		{
+			return true;
+		}
+	}
+
+	return Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation);
 }
 
 void AP1HeroCharacter::PossessedBy(AController* NewController)

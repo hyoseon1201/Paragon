@@ -11,6 +11,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "TimerManager.h"
 #include "P1.h"
 
@@ -31,8 +32,11 @@ void AP1JungleCampAnchor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AP1JungleCampAnchor, RespawnServerTime);
-	DOREPLIFETIME(AP1JungleCampAnchor, TeamHasObservedDeath);
+	FDoRepLifetimeParams SharedParams;
+	SharedParams.bIsPushBased = true;
+
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1JungleCampAnchor, RespawnServerTime, SharedParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(AP1JungleCampAnchor, TeamHasObservedDeath, SharedParams);
 }
 
 void AP1JungleCampAnchor::BeginPlay()
@@ -171,6 +175,8 @@ void AP1JungleCampAnchor::OnMonsterDied(AP1JungleMonsterCharacter* DeadMonster)
 		const AP1GameState* P1GS = GetWorld() ? GetWorld()->GetGameState<AP1GameState>() : nullptr;
 		TeamHasObservedDeath.Init(false, P1GS ? P1GS->GetNumTeams() : 0);
 		RespawnServerTime = GetWorld()->GetTimeSeconds() + RespawnDelay;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1JungleCampAnchor, TeamHasObservedDeath, this);
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1JungleCampAnchor, RespawnServerTime, this);
 
 		GetWorldTimerManager().SetTimer(VisionCheckTimerHandle, this, &AP1JungleCampAnchor::CheckTeamVisionOfDeadCamp, 0.5f, true);
 
@@ -221,6 +227,7 @@ void AP1JungleCampAnchor::CheckTeamVisionOfDeadCamp()
 		if (bInRange)
 		{
 			TeamHasObservedDeath[TeamId] = true;
+			MARK_PROPERTY_DIRTY_FROM_NAME(AP1JungleCampAnchor, TeamHasObservedDeath, this);
 		}
 	}
 

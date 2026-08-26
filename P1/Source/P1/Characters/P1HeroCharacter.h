@@ -29,6 +29,12 @@ public:
 	// IGenericTeamAgentInterface
 	virtual FGenericTeamId GetGenericTeamId() const override;
 
+	// 아군은 거리 무관 항상 relevant(미니맵 "아군 항상 표시" + 시야 제공 설계가 전제하는 "위치는 이미
+	// 전원에게 리플리케이트돼 있다"를 유지), 적은 기본 거리 컬링(NetCullDistanceSquared)이 적용되게
+	// 팀 기준으로 분기한다 — bAlwaysRelevant(전체 커넥션에 무조건 true)로는 이 팀별 분기가 불가능해서
+	// 직접 오버라이드했다.
+	virtual bool IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget, const FVector& SrcLocation) const override;
+
 	virtual void PossessedBy(AController* NewController) override;
 	virtual void OnRep_PlayerState() override;
 

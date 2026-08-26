@@ -8,6 +8,7 @@
 #include "GenericTeamAgentInterface.h"
 #include "ActiveGameplayEffectHandle.h"
 #include "GameplayAbilitySpecHandle.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "P1PlayerState.generated.h"
 
 class UP1AbilitySystemComponent;
@@ -49,7 +50,7 @@ public:
 	// 스코어보드에서는 자기 자신 행만 뜨고 나머지는 비는 버그가 났다 — 그래서 값 자체를 PlayerState의
 	// 복제 프로퍼티로 들고 다닌다(Pawn이 사망~리스폰 사이 없어도 값이 유지되는 부가 이점도 있음).
 	FText GetHeroDisplayName() const { return HeroDisplayName; }
-	void SetHeroDisplayName(const FText& NewName) { if (HasAuthority()) { HeroDisplayName = NewName; } }
+	void SetHeroDisplayName(const FText& NewName) { if (HasAuthority()) { HeroDisplayName = NewName; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, HeroDisplayName, this); } }
 
 	// HUD(레벨/KDA/스킬포인트) 갱신용 네이티브 델리게이트 — GAS 어트리뷰트가 아닌 plain 복제 int라
 	// GetGameplayAttributeValueChangeDelegate() 경로를 못 쓰므로 직접 브로드캐스트한다. 값을 바꾸는
@@ -74,8 +75,8 @@ public:
 	// UP1AbilitySystemComponent::ServerInvestSkillPoint()가 호출한다(포인트 검증 + 소비를 그쪽 로직과
 	// 같은 서버 함수 안에서 원자적으로 처리하기 위해, 여기서는 0 이하로 내려가지 않도록만 방어).
 	int32 GetSkillPoints() const { return SkillPoints; }
-	void AddSkillPoint() { if (HasAuthority()) { ++SkillPoints; OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
-	void SpendSkillPoint() { if (HasAuthority() && SkillPoints > 0) { --SkillPoints; OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
+	void AddSkillPoint() { if (HasAuthority()) { ++SkillPoints; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this); OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
+	void SpendSkillPoint() { if (HasAuthority() && SkillPoints > 0) { --SkillPoints; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this); OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
 
 	// --- 킬/데스/어시스트 (전투 보상 시스템) ---
 	int32 GetKills() const { return Kills; }
@@ -89,9 +90,9 @@ public:
 
 	// UP1AttributeSet::HandleKillRewards()에서만 호출 — 서버 전용(Damage GE는 항상 서버에서만 적용되므로
 	// 이 함수들이 클라에서 불릴 일 자체가 없다).
-	void AddKill() { ++Kills; ++KillStreak; OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
-	void AddDeath() { ++Deaths; KillStreak = 0; if (const UWorld* World = GetWorld()) { LastDeathTime = World->GetTimeSeconds(); } OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
-	void AddAssist() { ++Assists; OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
+	void AddKill() { ++Kills; ++KillStreak; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Kills, this); MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
+	void AddDeath() { ++Deaths; KillStreak = 0; if (const UWorld* World = GetWorld()) { LastDeathTime = World->GetTimeSeconds(); } MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Deaths, this); MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
+	void AddAssist() { ++Assists; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Assists, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
 
 	// --- 스턴 종료 시각(머리 위 스턴바 카운트다운용) ---
 	// 서버가 스턴 적용 시 "스턴이 끝나는 서버 월드 시각"(GetWorld()->GetTimeSeconds() + 지속시간)을 여기

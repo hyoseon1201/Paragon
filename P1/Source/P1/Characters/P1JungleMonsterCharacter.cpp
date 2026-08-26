@@ -29,6 +29,14 @@ AP1JungleMonsterCharacter::AP1JungleMonsterCharacter()
 	// 지정돼 있어도 아무도 Possess하지 않아 BT가 영원히 안 돎.
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
+	// 리플리케이션 부담 완화(2026-08-25, Insights 실측 — GameNetDriver 리플리케이션 비용의 35.84%가
+	// 이 클래스였음) — AI가 조종하는 몬스터는 플레이어 입력처럼 즉각 반응성이 필요 없고, 서버 자체가
+	// 30Hz 캡(NetServerMaxTickRate)이라 이보다 낮은 값만 실제로 체크 빈도를 줄인다.
+	SetNetUpdateFrequency(15.0f);
+	// 4000은 실측 성능은 가장 좋았으나(팀별 순찰 분산과 합쳐 GameNetDriver 비용 대폭 감소 확인,
+	// 2026-08-26) PIE 체감상 너무 짧아 팝인이 거슬려서 6000으로 되돌림 — 시야 체감이 성능보다 우선.
+	SetNetCullDistanceSquared(6000.0f * 6000.0f);
+
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	// 이 ASC엔 "소유 클라이언트"가 없다(AI 컨트롤러 소유, 사람이 조종하지 않음) — Full로 GE까지

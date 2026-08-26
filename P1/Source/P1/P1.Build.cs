@@ -12,7 +12,7 @@ public class P1 : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayAbilities", "GameplayTags", "GameplayTasks", "AIModule", "NavigationSystem", "ModularGameplay", "UMG", "MotionWarping", "HTTP", "Json", "JsonUtilities" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "Slate", "SlateCore", "Niagara" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "Slate", "SlateCore", "Niagara", "NetCore" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
