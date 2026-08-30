@@ -42,17 +42,16 @@ void AP1PlayerController::BeginPlay()
 		bShowMouseCursor = false;
 
 		// DefaultEngine.ini의 [/Script/Engine.GameNetworkManager] 섹션 값이 원인 불명으로 CDO에
-		// 반영되지 않는 걸 확인해서(에디터 재시작 후에도 콘솔 get 명령이 여전히 엔진 기본값 0.0166을
+		// 반영되지 않는 걸 확인해서(에디터 재시작 후에도 콘솔 get 명령이 여전히 엔진 기본값을
 		// 반환) ini 대신 코드로 직접 강제한다. GameInstanceClass가 프로젝트에 지정돼 있지 않아
 		// UP1GameInstance::Init()이 애초에 실행되지 않으므로 대신 여기서 처리 — 이 값은 클라이언트가
 		// 서버로 이동 정보를 보내는 주기를 결정하므로 로컬(=이 값을 실제로 쓰는) 클라이언트에서
-		// 세팅해야 한다. 서버 NetServerMaxTickRate=30Hz에 맞춰 1/30로 하향
-		// (baseline Insights 실측 — ServerMovePacked Excl 1위, ~14%).
+		// 세팅해야 한다. 서버 NetServerMaxTickRate(실전 목표 60Hz, 2코어 기준)에 맞춰 1/60로 세팅.
 		if (AGameNetworkManager* NetworkManagerCDO = GetMutableDefault<AGameNetworkManager>())
 		{
-			NetworkManagerCDO->ClientNetSendMoveDeltaTime = 0.0333f;
-			NetworkManagerCDO->ClientNetSendMoveDeltaTimeThrottled = 0.0333f;
-			NetworkManagerCDO->ClientNetSendMoveDeltaTimeStationary = 0.0333f;
+			NetworkManagerCDO->ClientNetSendMoveDeltaTime = 0.0166f;
+			NetworkManagerCDO->ClientNetSendMoveDeltaTimeThrottled = 0.0166f;
+			NetworkManagerCDO->ClientNetSendMoveDeltaTimeStationary = 0.0166f;
 		}
 	}
 }

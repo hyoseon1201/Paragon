@@ -35,7 +35,6 @@ void UP1BotArenaComponent::BeginPlay()
 		return;
 	}
 
-	int32 BotId = -1;
 	if (!FParse::Value(FCommandLine::Get(), TEXT("BotId="), BotId))
 	{
 		return; // -BotId= 없으면 일반 플레이어 — 조용히 종료.
@@ -110,6 +109,15 @@ void UP1BotArenaComponent::TickComponent(float DeltaTime, ELevelTick TickType, F
 	Character->AddMovementInput(ToWaypoint.GetSafeNormal(), 1.0f);
 }
 
+FVector UP1BotArenaComponent::GetOffsetPatrolTarget(int32 Index) const
+{
+	const FVector Base = PatrolLocations[Index];
+	// 47은 7(캠프 개수)과 서로소라 BotId가 늘어도 같은 각도로 겹치는 경우가 잘 안 생긴다.
+	const float AngleRad = FMath::DegreesToRadians(static_cast<float>((BotId * 47) % 360));
+	constexpr float OffsetRadius = 300.0f;
+	return Base + FVector(FMath::Cos(AngleRad), FMath::Sin(AngleRad), 0.0f) * OffsetRadius;
+}
+
 void UP1BotArenaComponent::RequestPathToCurrentTarget(AP1CharacterBase* Character)
 {
 	CurrentPathPoints.Reset();
@@ -121,7 +129,7 @@ void UP1BotArenaComponent::RequestPathToCurrentTarget(AP1CharacterBase* Characte
 	}
 
 	const FVector Start = Character->GetActorLocation();
-	const FVector End = PatrolLocations[CurrentPatrolIndex];
+	const FVector End = GetOffsetPatrolTarget(CurrentPatrolIndex);
 
 	if (UNavigationPath* NavPath = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), Start, End))
 	{
@@ -177,8 +185,23 @@ void UP1BotArenaComponent::ApplyTeamPatrolOffsetIfReady()
 	{
 		// 팀마다 캠프 목록을 균등하게 나눠 서로 다른 지점에서 순찰을 시작 — 같은 캠프에 몰리지 않고
 		// 흩어지게 해서, 팀 간 거리가 자연스럽게 벌어져 히어로 NetCullDistanceSquared 컬링이 실제로
-		// 걸릴 기회를 만든다. 순서 자체(다음 캠프로 넘어가는 방향)는 그대로 두고 시작점만 다르게 한다.
-		CurrentPatrolIndex = (TeamId * PatrolLocations.Num()) / NumTeams;
+		// 걸릴 기회를 만든다. **+BotId**: 팀 기준 인덱스만 쓰면 같은 팀 봇 전원이 정확히 같은 좌표를
+		// 목표로 걷다가 서로의 CollisionCylinder에 부딪혀 영구히 낌(실제로 겪은 버그 — 같은 팀 3마리가
+		// 전부 동일 StartIndex로 배정된 로그, 그리고 한 봇이 다른 봇 캐릭터에 막혀 몇 분간 완전히
+		// 정지한 CharacterMovement 로그로 확인됨). BotId를 더해 같은 팀이라도 서로 다른 캠프로
+		// 갈라지게 한다.
+		CurrentPatrolIndex = ((TeamId * PatrolLocations.Num()) / NumTeams + BotId) % PatrolLocations.Num();
+
+		// 팀 배정(AP1ArenaGameMode::ChoosePlayerStart_Implementation)이 이 컴포넌트의 BeginPlay보다
+		// 먼저 끝난다는 보장이 없어서, TickComponent()가 이미 기본값(인덱스 0) 목표로 걷기 시작한
+		// *이후에* 여기서 인덱스가 바뀌는 경우가 실제로 있다 — 이때 CurrentPathPoints를 그대로 두면
+		// TickComponent는 옛 목표(인덱스 0)를 향해 계속 걸어가 결국 거기 도착하는데, BotTick()의 도착
+		// 판정은 이미 바뀐 새 인덱스 좌표와 비교하니 거리가 영원히 안 좁혀져 그 자리에 영구 정지한다
+		// (실제로 겪은 버그 — 진단 로그로 확인: TargetIdx는 바뀐 값인데 CharLoc은 옛 목표 지점에 고정).
+		// 인덱스가 실제로 바뀔 때는 진행 중이던 경로/도착 상태를 BotTick()의 "다음 캠프로" 전환과
+		// 동일하게 리셋해 TickComponent가 새 목표로 다시 계산하게 한다.
+		CurrentPathPoints.Reset();
+		bHasArrivedAtCurrentTarget = false;
 	}
 
 	bPatrolStartOffsetApplied = true;
@@ -208,7 +231,7 @@ void UP1BotArenaComponent::BotTick()
 		return; // 스폰 전이거나 사망 중 — 다음 틱에 다시 시도.
 	}
 
-	const FVector& Target = PatrolLocations[CurrentPatrolIndex];
+	const FVector Target = GetOffsetPatrolTarget(CurrentPatrolIndex);
 	FVector ToTarget = Target - Character->GetActorLocation();
 	ToTarget.Z = 0.0f;
 

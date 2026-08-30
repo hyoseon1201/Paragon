@@ -78,10 +78,24 @@ private:
 	void ApplyTeamPatrolOffsetIfReady();
 	bool bPatrolStartOffsetApplied = false;
 
+	// -BotId=N에서 파싱한 값 — 팀 기준 순찰 시작 인덱스에 더해서 같은 팀 봇끼리도 서로 다른 캠프로
+	// 흩어지게 하는 데 쓴다(ApplyTeamPatrolOffsetIfReady 참고). BeginPlay에서 설정.
+	int32 BotId = -1;
+
 	// PatrolLocations[CurrentPatrolIndex]까지 내비메시 경로를 계산해 CurrentPathPoints에 채운다
 	// (실패 시 직선 목표 하나짜리 경로로 폴백). CurrentPathPoints가 비어있을 때 TickComponent()가
 	// 호출한다 — BeginPlay 시점엔 아직 캐릭터가 스폰 전이라 여기서 미리 계산해둘 수 없다.
 	void RequestPathToCurrentTarget(AP1CharacterBase* Character);
+
+	// PatrolLocations[Index](캠프 앵커의 정확한 좌표)에 BotId 기반 원형 오프셋을 더해 반환한다.
+	// 봇 수가 캠프 수(예: 7)보다 많으면 같은 CurrentPatrolIndex를 공유하는 봇 쌍이 생기는 게
+	// 불가피한데(ApplyTeamPatrolOffsetIfReady의 팀/BotId 오프셋으로도 BotId 차이가 캠프 개수의
+	// 배수면 modulo 연산상 완전히 같은 인덱스로 충돌함), 이때 실제 목표 "좌표"까지 정확히 똑같으면
+	// 두 봇이 스폰 직후부터 거의 같은 방향으로 걸어가다 서로의 CollisionCylinder에 영구히 끼는
+	// 버그가 있었다(실제로 겪음 — CharacterMovement 로그에 몇 분간 완전히 고정된 좌표로 확인).
+	// 정글 몬스터 무리 스폰(AP1JungleCampAnchor::ComputeSpawnOffset)과 같은 패턴으로, 인덱스가
+	// 같아도 실제 걸어가는 좌표 자체를 봇마다 다르게 흩어 이 충돌을 원천 차단한다.
+	FVector GetOffsetPatrolTarget(int32 Index) const;
 
 	FTimerHandle BotTickTimerHandle;
 	TArray<FVector> PatrolLocations;
