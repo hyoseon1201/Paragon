@@ -29,6 +29,11 @@ void UP1AbilitySystemComponent::OnRep_AbilitiesGiven()
 	AbilitiesGivenDelegate.Broadcast();
 }
 
+void UP1AbilitySystemComponent::SetRepAnimPositionMethod(ERepAnimPositionMethod InMethod)
+{
+	GetRepAnimMontageInfo_Mutable().SetRepAnimPositionMethod(InMethod);
+}
+
 void UP1AbilitySystemComponent::ReduceCooldownByInputTag(FGameplayTag InputTag, float Percent)
 {
 	if (!GenericCooldownReductionEffectClass)

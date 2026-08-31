@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbilityRepAnimMontage.h"
 #include "P1AbilitySystemComponent.generated.h"
 
 // 어빌리티 Spec의 DynamicAbilityTags에 입력 태그(예: InputTag.Ability.Q)를 달아두고,
@@ -41,6 +42,11 @@ public:
 	// 자기 자신에게만 하던 "남은시간 재계산 후 제거+재적용"을 여러 어빌리티에 범용으로 적용한 버전).
 	// 애쉬브링어(아이템) 고유효과 "크로노 스트라이크"가 첫 사용처 — UP1GameplayAbility_Item_ChronoStrike 참고.
 	void ReduceCooldownByInputTag(FGameplayTag InputTag, float Percent);
+
+	// RepAnimMontageInfo(GAS 내장 몽타주 리플리케이션 구조체)의 대역폭 최적화 스위치.
+	// GetRepAnimMontageInfo_Mutable()이 엔진 UAbilitySystemComponent에서 protected라 하위 클래스인
+	// 이 컴포넌트를 거쳐야만 어빌리티 코드(예: MeleeAttack)에서 호출할 수 있다.
+	void SetRepAnimPositionMethod(ERepAnimPositionMethod InMethod);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
