@@ -208,6 +208,11 @@ protected:
 	// 아이템이 반응하는지 전혀 몰라도 된다(Event.Character.BasicAttackHitDealt와 동일한 범용 디스패치 원칙).
 	void OnImmobilizedTagChanged(FGameplayTag Tag, int32 NewCount);
 
+	// 머리 위 위젯의 레벨 표시 갱신 — 몬스터와 달리 히어로는 레벨업으로 값이 계속 바뀌므로
+	// PS->OnCharacterLevelChangedNative를 구독해 매번 다시 호출한다(초기값은
+	// HandleAbilitySystemReady에서 한 번, 이후 변경은 이 콜백에서).
+	void OnCharacterLevelChangedForFloatingStatus(int32 NewLevel);
+
 	// 진단용 — ASC->AbilityFailedCallbacks 구독. 클라이언트가 예측 활성화한 LocalPredicted 어빌리티가
 	// 서버의 authoritative 재검증에서 거부됐을 때 호출된다("홀드 중 어빌리티가 갑자기 끝남" 진단 포인트).
 	void OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason);

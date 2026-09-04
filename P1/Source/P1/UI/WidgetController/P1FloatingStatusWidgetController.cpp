@@ -10,12 +10,18 @@
 
 void UP1FloatingStatusWidgetController::BroadcastInitialValues()
 {
-	bool bFound = false;
-	OnHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetHealthAttribute(), bFound));
-	OnMaxHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxHealthAttribute(), bFound));
-	OnManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFound));
-	OnMaxManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxManaAttribute(), bFound));
-
+	if (bIsLocallyOwned)
+	{
+		bool bFound = false;
+		OnHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetHealthAttribute(), bFound));
+		OnMaxHealthChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxHealthAttribute(), bFound));
+		OnManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetManaAttribute(), bFound));
+		OnMaxManaChanged.Broadcast(AbilitySystemComponent->GetGameplayAttributeValue(UP1AttributeSet::GetMaxManaAttribute(), bFound));
+	}
+	else
+	{
+		OnCompactAttributesChanged();
+	}
 	// 컨트롤러/위젯이 생성되는 시점에 캐릭터가 이미 스턴 상태일 수도 있다(예: 늦게 접속한 관전 시점 등) —
 	// 초기값도 다른 델리게이트들과 동일하게 한 번 브로드캐스트해 커버한다.
 	RefreshStun();
@@ -23,14 +29,22 @@ void UP1FloatingStatusWidgetController::BroadcastInitialValues()
 
 void UP1FloatingStatusWidgetController::BindCallbacksToDependencies()
 {
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetHealthAttribute())
-		.AddUObject(this, &UP1FloatingStatusWidgetController::OnHealthAttributeChanged);
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetMaxHealthAttribute())
-		.AddUObject(this, &UP1FloatingStatusWidgetController::OnMaxHealthAttributeChanged);
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetManaAttribute())
-		.AddUObject(this, &UP1FloatingStatusWidgetController::OnManaAttributeChanged);
-	AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetMaxManaAttribute())
-		.AddUObject(this, &UP1FloatingStatusWidgetController::OnMaxManaAttributeChanged);
+
+	if (bIsLocallyOwned)
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetHealthAttribute())
+			.AddUObject(this, &UP1FloatingStatusWidgetController::OnHealthAttributeChanged);
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetMaxHealthAttribute())
+			.AddUObject(this, &UP1FloatingStatusWidgetController::OnMaxHealthAttributeChanged);
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetManaAttribute())
+			.AddUObject(this, &UP1FloatingStatusWidgetController::OnManaAttributeChanged);
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UP1AttributeSet::GetMaxManaAttribute())
+			.AddUObject(this, &UP1FloatingStatusWidgetController::OnMaxManaAttributeChanged);
+	}
+	else if (UP1AttributeSet* AS = Cast<UP1AttributeSet>(AttributeSet))
+	{
+		AS->OnCompactAttributesChangedNative.AddUObject(this, &UP1FloatingStatusWidgetController::OnCompactAttributesChanged);
+	}
 
 	AbilitySystemComponent->RegisterGameplayTagEvent(TAG_State_Stunned, EGameplayTagEventType::NewOrRemoved)
 		.AddUObject(this, &UP1FloatingStatusWidgetController::OnStunnedTagChanged);
@@ -48,6 +62,18 @@ void UP1FloatingStatusWidgetController::OnHealthAttributeChanged(const FOnAttrib
 void UP1FloatingStatusWidgetController::OnMaxHealthAttributeChanged(const FOnAttributeChangeData& Data){ OnMaxHealthChanged.Broadcast(Data.NewValue); }
 void UP1FloatingStatusWidgetController::OnManaAttributeChanged(const FOnAttributeChangeData& Data)     { OnManaChanged.Broadcast(Data.NewValue); }
 void UP1FloatingStatusWidgetController::OnMaxManaAttributeChanged(const FOnAttributeChangeData& Data)  { OnMaxManaChanged.Broadcast(Data.NewValue); }
+
+void UP1FloatingStatusWidgetController::OnCompactAttributesChanged()
+{
+	if (const UP1AttributeSet* AttrSet = Cast<UP1AttributeSet>(AttributeSet))
+	{
+		const FP1CompactAttributeSnapshot& Snapshot = AttrSet->GetCompactAttributes();
+		OnHealthChanged.Broadcast(Snapshot.Health);
+		OnMaxHealthChanged.Broadcast(Snapshot.MaxHealth);
+		OnManaChanged.Broadcast(Snapshot.Mana);
+		OnMaxManaChanged.Broadcast(Snapshot.MaxMana);
+	}
+}
 
 void UP1FloatingStatusWidgetController::OnStunnedTagChanged(const FGameplayTag Tag, int32 NewCount)
 {

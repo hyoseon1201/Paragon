@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AttributeSet.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystem/P1CompactAttributeSnapshot.h"
 #include "P1AttributeSet.generated.h"
 
 class AP1PlayerState;
@@ -167,65 +168,105 @@ public:
 	FGameplayAttributeData CriticalHitFlag;
 	ATTRIBUTE_ACCESSORS(UP1AttributeSet, CriticalHitFlag)
 
+	UPROPERTY(ReplicatedUsing = OnRep_CompactAttributes)
+	FP1CompactAttributeSnapshot CompactAttributes;
+
+	DECLARE_MULTICAST_DELEGATE(FOnCompactAttributesChangedNative);
+	FOnCompactAttributesChangedNative OnCompactAttributesChangedNative;
+
+	const FP1CompactAttributeSnapshot& GetCompactAttributes() const { return CompactAttributes; }
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
 
 protected:
 	UFUNCTION()
 	virtual void OnRep_Health(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_Mana(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MaxMana(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_HealthRegen(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_ManaRegen(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_PhysicalPower(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MagicalPower(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_AttackSpeed(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_BasicAttackTime(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_AttackRange(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_Cleave(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_PhysicalArmor(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MagicalArmor(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_PhysicalPenetration(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MagicalPenetration(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_LifeSteal(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_Tenacity(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_DamageReduction(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_AbilityHaste(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_UltimateHaste(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_UltimateDamagePercent(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_CriticalChance(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_CriticalDamage(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_MovementSpeed(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_Gold(const FGameplayAttributeData& OldValue);
+
 	UFUNCTION()
 	virtual void OnRep_Experience(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_CompactAttributes();
+
+	void RefreshCompactAttributes();
 
 private:
 	void ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const;

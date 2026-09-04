@@ -41,6 +41,7 @@ public:
 	static constexpr uint8 MonsterTeamId = 254;
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// 캠프 스폰 지점 — 기본값은 BeginPlay 시점의 스폰 위치(레벨에 배치된 그대로)지만, 나중에 캠프
 	// 앵커 액터/스포너가 생기면 스폰 직후 이 함수로 정확한 캠프 좌표를 덮어쓸 수 있다.
@@ -150,7 +151,7 @@ protected:
 	// DefaultAttributesEffectClass를 평가할 레벨(1~18) — GE 스펙의 Level로 그대로 전달되어 Scalable
 	// Float 커브를 이 값 기준으로 조회한다. 지금은 스폰 시 고정값이고, 나중에 매치 경과 시간 기반
 	// 몬스터 레벨링 시스템이 붙으면 스폰 전에 이 값만 설정해주면 된다(재적용 로직은 그때 추가).
-	UPROPERTY(EditAnywhere, Category = "JungleMonster", meta = (ClampMin = "1"))
+	UPROPERTY(Replicated, EditAnywhere, Category = "JungleMonster", meta = (ClampMin = "1"))
 	int32 MonsterLevel = 1;
 
 	// 근접 공격 어빌리티 — BeginPlay에 GiveAbility, RequestMeleeAttack()이 이벤트로 트리거한다.

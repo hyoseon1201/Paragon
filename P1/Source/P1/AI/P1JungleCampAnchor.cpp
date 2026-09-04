@@ -130,6 +130,8 @@ void AP1JungleCampAnchor::SpawnMonster()
 		}
 
 		Monster->SetMonsterLevel(ComputedLevel);
+		UE_LOG(LogP1, Log, TEXT("[JungleCampAnchor] 몬스터 스폰 — 앵커=%s 클래스=%s index=%d 레벨=%d (매치 경과 시간=%.1f초)"),
+			*GetName(), *GetNameSafe(MonsterClass), Index, ComputedLevel, World->GetTimeSeconds());
 		Monster->SetOwningCampAnchor(this);
 		Monster->OnMonsterDied.AddUObject(this, &AP1JungleCampAnchor::OnMonsterDied);
 

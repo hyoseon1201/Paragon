@@ -63,13 +63,17 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	SharedParams.RepNotifyCondition = REPNOTIFY_Always;
 	SharedParams.bIsPushBased = true;
 
-	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Health, SharedParams);
-	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxHealth, SharedParams);
-	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Mana, SharedParams);
-	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxMana, SharedParams);
+	FDoRepLifetimeParams OwnerOnlyParams;
+	OwnerOnlyParams.Condition = COND_OwnerOnly;
+	OwnerOnlyParams.RepNotifyCondition = REPNOTIFY_Always;
+	OwnerOnlyParams.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Health, OwnerOnlyParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxHealth, OwnerOnlyParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Mana, OwnerOnlyParams);
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MaxMana, OwnerOnlyParams);
+
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, HealthRegen, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, ManaRegen, SharedParams);
-
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, PhysicalPower, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MagicalPower, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, AttackSpeed, SharedParams);
@@ -88,11 +92,15 @@ void UP1AttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, UltimateDamagePercent, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, CriticalChance, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, CriticalDamage, SharedParams);
-
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, MovementSpeed, SharedParams);
-
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Gold, SharedParams);
 	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, Experience, SharedParams);
+
+	FDoRepLifetimeParams SkipOwnerParams;
+	SkipOwnerParams.Condition = COND_SkipOwner;
+	SkipOwnerParams.RepNotifyCondition = REPNOTIFY_Always;
+	SkipOwnerParams.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AttributeSet, CompactAttributes, SkipOwnerParams);
 }
 
 void UP1AttributeSet::ClampAttribute(const FGameplayAttribute& Attribute, float& NewValue) const
@@ -263,6 +271,17 @@ void UP1AttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 	}
 }
 
+void UP1AttributeSet::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
+
+	if (Attribute == GetHealthAttribute() || Attribute == GetMaxHealthAttribute()
+		|| Attribute == GetManaAttribute() || Attribute == GetMaxManaAttribute())
+	{
+		RefreshCompactAttributes();
+	}
+}
+
 void UP1AttributeSet::OnRep_Health(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, Health, OldValue);
@@ -396,6 +415,32 @@ void UP1AttributeSet::OnRep_Gold(const FGameplayAttributeData& OldValue)
 void UP1AttributeSet::OnRep_Experience(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UP1AttributeSet, Experience, OldValue);
+}
+
+void UP1AttributeSet::OnRep_CompactAttributes()
+{
+	OnCompactAttributesChangedNative.Broadcast();
+}
+
+void UP1AttributeSet::RefreshCompactAttributes()
+{
+	UAbilitySystemComponent* ASC = GetOwningAbilitySystemComponent();
+	if (!ASC || !ASC->IsOwnerActorAuthoritative())
+	{
+		return;
+	}
+
+	FP1CompactAttributeSnapshot NewSnapshot;
+	NewSnapshot.Health = GetHealth();
+	NewSnapshot.MaxHealth = GetMaxHealth();
+	NewSnapshot.Mana = GetMana();
+	NewSnapshot.MaxMana = GetMaxMana();
+
+	if (NewSnapshot != CompactAttributes)
+	{
+		CompactAttributes = NewSnapshot;
+		MARK_PROPERTY_DIRTY_FROM_NAME(UP1AttributeSet, CompactAttributes, this);
+	}
 }
 
 void UP1AttributeSet::NotifyDamageDealt(const FGameplayEffectModCallbackData& Data, float DamageAmount)

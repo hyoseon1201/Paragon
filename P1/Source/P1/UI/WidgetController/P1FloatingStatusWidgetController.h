@@ -18,6 +18,8 @@ public:
 	virtual void BroadcastInitialValues() override;
 	virtual void BindCallbacksToDependencies() override;
 
+	void SetIsLocallyOwned(bool bInIsLocallyOwned) { bIsLocallyOwned = bInIsLocallyOwned; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnAttributeChangedSignature OnHealthChanged;
 
@@ -36,10 +38,14 @@ public:
 	FOnStunStateChangedSignature OnStunStateChanged;
 
 private:
+	bool bIsLocallyOwned = false;
+
 	void OnHealthAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnMaxHealthAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnManaAttributeChanged(const FOnAttributeChangeData& Data);
 	void OnMaxManaAttributeChanged(const FOnAttributeChangeData& Data);
+
+	void OnCompactAttributesChanged();
 
 	// 스턴바 상태를 다시 계산해 브로드캐스트하는 공통 진입점. 두 트리거가 각자 시점에 이걸 호출한다:
 	//  (1) State.Stunned 태그 카운트 변경(전원 복제) → OnStunnedTagChanged → 표시/숨김 결정

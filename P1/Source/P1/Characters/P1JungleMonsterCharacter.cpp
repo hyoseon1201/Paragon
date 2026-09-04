@@ -18,6 +18,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Net/UnrealNetwork.h"
 #include "P1.h"
 
 AP1JungleMonsterCharacter::AP1JungleMonsterCharacter()
@@ -126,6 +127,13 @@ void AP1JungleMonsterCharacter::Tick(float DeltaSeconds)
 	const float MaxHealth = AttributeSet->GetMaxHealth();
 	const float HealAmount = MaxHealth * LeashRecoveryHealPercentPerSecond * DeltaSeconds;
 	AttributeSet->SetHealth(FMath::Min(AttributeSet->GetHealth() + HealAmount, MaxHealth));
+}
+
+void AP1JungleMonsterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AP1JungleMonsterCharacter, MonsterLevel);
 }
 
 void AP1JungleMonsterCharacter::ApplyDefaultAttributes()

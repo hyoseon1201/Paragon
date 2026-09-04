@@ -189,11 +189,18 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 				const FWidgetControllerParams Params(nullptr, P1PS, ASC, P1PS->GetAttributeSet());
 				FloatingStatusWidgetController = NewObject<UP1FloatingStatusWidgetController>(this);
 				FloatingStatusWidgetController->SetWidgetControllerParams(Params);
+				FloatingStatusWidgetController->SetIsLocallyOwned(IsLocallyControlled());
 				FloatingStatusWidgetController->BindCallbacksToDependencies();
+
+				// 레벨은 이 컨트롤러 델리게이트 목록에 없는 PlayerState의 plain int라 여기서
+				// 직접 구독한다 — 컨트롤러를 처음 만들 때 한 번만 구독해 재호출(리스폰 등) 시
+				// 중복 바인딩되지 않게 한다.
+				P1PS->OnCharacterLevelChangedNative.AddUObject(this, &AP1HeroCharacter::OnCharacterLevelChangedForFloatingStatus);
 			}
 			FloatingWidget->SetWidgetController(FloatingStatusWidgetController);
 			FloatingStatusWidgetController->BroadcastInitialValues();
 			FloatingWidget->SetCharacterName(HeroDisplayName);
+			FloatingWidget->SetLevel(P1PS->GetCharacterLevel());
 		}
 	}
 
@@ -497,6 +504,20 @@ void AP1HeroCharacter::OnImmobilizedTagChanged(FGameplayTag Tag, int32 NewCount)
 	FGameplayEventData EventData;
 	EventData.EventTag = TAG_Event_Character_Immobilized;
 	ASC->HandleGameplayEvent(TAG_Event_Character_Immobilized, &EventData);
+}
+
+void AP1HeroCharacter::OnCharacterLevelChangedForFloatingStatus(int32 NewLevel)
+{
+	if (!IsValid(FloatingStatusComponent))
+	{
+		return;
+	}
+
+	if (UP1FloatingStatusWidget* FloatingWidget =
+		Cast<UP1FloatingStatusWidget>(FloatingStatusComponent->GetUserWidgetObject()))
+	{
+		FloatingWidget->SetLevel(NewLevel);
+	}
 }
 
 void AP1HeroCharacter::OnAbilityActivationFailed(const UGameplayAbility* Ability, const FGameplayTagContainer& FailureReason)
