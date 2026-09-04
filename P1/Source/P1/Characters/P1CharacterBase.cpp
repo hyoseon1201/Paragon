@@ -2,6 +2,9 @@
 
 #include "Characters/P1CharacterBase.h"
 #include "UI/P1FloatingWidgetComponent.h"
+#include "UI/Widget/HUD/P1FloatingStatusWidget.h"
+#include "UI/WidgetController/P1WidgetController.h"
+#include "UI/WidgetController/P1FloatingStatusWidgetController.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Particles/ParticleSystem.h"
@@ -25,8 +28,35 @@ AP1CharacterBase::AP1CharacterBase()
 	FloatingStatusComponent->SetDrawSize(FVector2D(180.f, 50.f));
 	FloatingStatusComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// 기본 유형은 영웅. 미니언/보스 서브클래스 BP에서 CharacterType을 재설정한다.
+	// 기본 유형은 영웅. 정글 몬스터는 자기 생성자에서 Character.Type.Monster로 재설정한다.
 	CharacterType = TAG_Character_Type_Hero;
+}
+
+UP1FloatingStatusWidget* AP1CharacterBase::InitFloatingStatusWidget(APlayerState* PS, UAbilitySystemComponent* ASC, UAttributeSet* AS, bool bLocallyOwned)
+{
+	if (!IsValid(FloatingStatusComponent))
+	{
+		return nullptr;
+	}
+
+	FloatingStatusComponent->InitWidget();
+	UP1FloatingStatusWidget* FloatingWidget = Cast<UP1FloatingStatusWidget>(FloatingStatusComponent->GetUserWidgetObject());
+	if (!FloatingWidget)
+	{
+		return nullptr;
+	}
+
+	if (!FloatingStatusWidgetController)
+	{
+		const FWidgetControllerParams Params(nullptr, PS, ASC, AS);
+		FloatingStatusWidgetController = NewObject<UP1FloatingStatusWidgetController>(this);
+		FloatingStatusWidgetController->SetWidgetControllerParams(Params);
+		FloatingStatusWidgetController->SetIsLocallyOwned(bLocallyOwned);
+		FloatingStatusWidgetController->BindCallbacksToDependencies();
+	}
+	FloatingWidget->SetWidgetController(FloatingStatusWidgetController);
+	FloatingStatusWidgetController->BroadcastInitialValues();
+	return FloatingWidget;
 }
 
 bool AP1CharacterBase::IsHero() const
@@ -243,9 +273,10 @@ bool AP1CharacterBase::IsSameTeam(const AActor* A, const AActor* B)
 	const uint8 IdA = TeamA->GetGenericTeamId().GetId();
 	const uint8 IdB = TeamB->GetGenericTeamId().GetId();
 
-	// 255(NoTeam)은 팀 미설정 상태 — 같은 팀으로 취급하지 않아 공격 허용.
+	// NoTeam(255)은 팀 미설정 상태 — 같은 팀으로 취급하지 않아 공격 허용.
 	// 프로덕션에서는 GameMode가 모든 캐릭터에 팀을 할당하므로 이 경로에 걸리지 않아야 한다.
-	if (IdA == 255 || IdB == 255)
+	const uint8 NoTeamId = FGenericTeamId::NoTeam.GetId();
+	if (IdA == NoTeamId || IdB == NoTeamId)
 	{
 		return false;
 	}

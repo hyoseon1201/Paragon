@@ -92,26 +92,12 @@ void AP1JungleMonsterCharacter::BeginPlay()
 		}
 	}
 
-	// 머리 위 HP 바 — 히어로(AP1HeroCharacter::HandleAbilitySystemReady)와 동일한 초기화 패턴이지만,
-	// 몬스터는 "누구 화면에서도" 항상 보여야 하므로 IsLocallyControlled() 숨김 분기가 없다(애초에
-	// 사람이 조종하지 않아 항상 false).
-	if (IsValid(FloatingStatusComponent))
+	// 머리 위 HP 바 — 공용 초기화(AP1CharacterBase::InitFloatingStatusWidget) 사용. 몬스터는 "누구 화면에서도"
+	// 항상 보여야 하므로 히어로와 달리 IsLocallyControlled() 숨김 분기가 없고(사람이 조종하지 않아 항상 false),
+	// 소유 클라이언트도 없으니 bLocallyOwned=false로 압축 스냅샷(CompactAttributes) 경로를 구독한다.
+	if (UP1FloatingStatusWidget* FloatingWidget = InitFloatingStatusWidget(nullptr, AbilitySystemComponent, AttributeSet, false))
 	{
-		FloatingStatusComponent->InitWidget();
-		if (UP1FloatingStatusWidget* FloatingWidget =
-			Cast<UP1FloatingStatusWidget>(FloatingStatusComponent->GetUserWidgetObject()))
-		{
-			if (!FloatingStatusWidgetController)
-			{
-				const FWidgetControllerParams Params(nullptr, nullptr, AbilitySystemComponent, AttributeSet);
-				FloatingStatusWidgetController = NewObject<UP1FloatingStatusWidgetController>(this);
-				FloatingStatusWidgetController->SetWidgetControllerParams(Params);
-				FloatingStatusWidgetController->BindCallbacksToDependencies();
-			}
-			FloatingWidget->SetWidgetController(FloatingStatusWidgetController);
-			FloatingStatusWidgetController->BroadcastInitialValues();
-			FloatingWidget->SetLevel(MonsterLevel);
-		}
+		FloatingWidget->SetLevel(MonsterLevel);
 	}
 }
 
@@ -133,7 +119,9 @@ void AP1JungleMonsterCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AP1JungleMonsterCharacter, MonsterLevel);
+	// 스폰 전(SetMonsterLevel → FinishSpawning 순서)에 한 번 정해지고 이후 절대 바뀌지 않으므로 초기 복제만 —
+	// 매 넷업데이트마다 비교할 이유가 없다. 클라이언트는 BeginPlay의 SetLevel(MonsterLevel)에서 이 값을 읽는다.
+	DOREPLIFETIME_CONDITION(AP1JungleMonsterCharacter, MonsterLevel, COND_InitialOnly);
 }
 
 void AP1JungleMonsterCharacter::ApplyDefaultAttributes()

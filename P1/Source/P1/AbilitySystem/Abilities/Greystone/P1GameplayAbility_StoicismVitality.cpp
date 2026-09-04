@@ -80,7 +80,8 @@ void UP1GameplayAbility_StoicismVitality::OnVitalityTick()
 		}
 	}
 
-	UE_LOG(LogP1, Log, TEXT("[StoicismVitality] Tick — Health=%.1f/%.1f MissingRatio=%.2f ValueMult=%.2f LowHealth=%d HealThisTick=%.2f"),
+	// 매초 영웅마다 찍히는 상시 로그라 기본 Verbosity에선 끈다 — 필요 시 콘솔 `log LogP1 Verbose`.
+	UE_LOG(LogP1, Verbose, TEXT("[StoicismVitality] Tick — Health=%.1f/%.1f MissingRatio=%.2f ValueMult=%.2f LowHealth=%d HealThisTick=%.2f"),
 		CurrentHealth, MaxHealth, MissingRatio, ValueMultiplier, bLowHealth ? 1 : 0, HealThisTick);
 
 	if (ArmorBuffEffectClass)

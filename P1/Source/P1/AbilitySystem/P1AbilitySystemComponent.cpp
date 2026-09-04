@@ -5,18 +5,25 @@
 #include "AbilitySystem/P1GameplayAbility.h"
 #include "Player/P1PlayerState.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "GameplayEffect.h"
 #include "P1.h"
 
 void UP1AbilitySystemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UP1AbilitySystemComponent, bAbilitiesGiven);
+
+	// 프로젝트의 나머지 복제 프로퍼티(PlayerState/GameState/AttributeSet/CampAnchor)와 동일하게 Push Model —
+	// 매치당 한 번 true로 바뀌는 값이라 매 넷업데이트마다 비교할 이유가 없다.
+	FDoRepLifetimeParams Params;
+	Params.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(UP1AbilitySystemComponent, bAbilitiesGiven, Params);
 }
 
 void UP1AbilitySystemComponent::SetAbilitiesGiven()
 {
 	bAbilitiesGiven = true;
+	MARK_PROPERTY_DIRTY_FROM_NAME(UP1AbilitySystemComponent, bAbilitiesGiven, this);
 	UE_LOG(LogP1, Log, TEXT("[ASC][AbilitiesGiven] SetAbilitiesGiven() 호출(서버/로컬) — Owner=%s | AbilitiesGivenDelegate 브로드캐스트"),
 		GetOwnerActor() ? *GetOwnerActor()->GetName() : TEXT("null"));
 	AbilitiesGivenDelegate.Broadcast();
@@ -27,11 +34,6 @@ void UP1AbilitySystemComponent::OnRep_AbilitiesGiven()
 	UE_LOG(LogP1, Log, TEXT("[ASC][AbilitiesGiven] OnRep_AbilitiesGiven() 호출(리플리케이트 수신) — Owner=%s | AbilitiesGivenDelegate 브로드캐스트"),
 		GetOwnerActor() ? *GetOwnerActor()->GetName() : TEXT("null"));
 	AbilitiesGivenDelegate.Broadcast();
-}
-
-void UP1AbilitySystemComponent::SetRepAnimPositionMethod(ERepAnimPositionMethod InMethod)
-{
-	GetRepAnimMontageInfo_Mutable().SetRepAnimPositionMethod(InMethod);
 }
 
 void UP1AbilitySystemComponent::ReduceCooldownByInputTag(FGameplayTag InputTag, float Percent)

@@ -145,7 +145,7 @@ void UP1OverlayWidgetController::BroadcastAbilityInvestState()
 		// MaxAbilityLevel<=1(기본값) = 투자 불가 어빌리티(기본공격/패시브 등) — 애초에 브로드캐스트하지 않는다.
 		if (!Ability || !Ability->InputTag.IsValid() || Ability->MaxAbilityLevel <= 1)
 		{
-			UE_LOG(LogP1, Log, TEXT("[OverlayWC][Invest] 스킵 — %s | MaxAbilityLevel=%d (투자 불가 어빌리티)"),
+			UE_LOG(LogP1, Verbose, TEXT("[OverlayWC][Invest] 스킵 — %s | MaxAbilityLevel=%d (투자 불가 어빌리티)"),
 				Ability ? *Ability->GetClass()->GetName() : TEXT("null"), Ability ? Ability->MaxAbilityLevel : -1);
 			continue;
 		}
@@ -153,7 +153,7 @@ void UP1OverlayWidgetController::BroadcastAbilityInvestState()
 		const bool bBelowMaxLevel = Spec.Level < Ability->MaxAbilityLevel;
 		const bool bMeetsCharacterLevelGate = P1PS->GetCharacterLevel() >= Ability->GetRequiredCharacterLevelForNextRank(Spec.Level);
 		const bool bCanInvest = bHasSkillPoints && bBelowMaxLevel && bMeetsCharacterLevelGate;
-		UE_LOG(LogP1, Log, TEXT("[OverlayWC][Invest] %s InputTag=%s SpecLevel=%d MaxLevel=%d SkillPoints=%d(has=%d) BelowMax=%d CharLevelGate=%d → bCanInvest=%d"),
+		UE_LOG(LogP1, Verbose, TEXT("[OverlayWC][Invest] %s InputTag=%s SpecLevel=%d MaxLevel=%d SkillPoints=%d(has=%d) BelowMax=%d CharLevelGate=%d → bCanInvest=%d"),
 			*Ability->GetClass()->GetName(), *Ability->InputTag.ToString(), Spec.Level, Ability->MaxAbilityLevel,
 			P1PS->GetSkillPoints(), bHasSkillPoints, bBelowMaxLevel, bMeetsCharacterLevelGate, bCanInvest);
 		OnAbilityInvestStateChanged.Broadcast(Ability->InputTag, bCanInvest);

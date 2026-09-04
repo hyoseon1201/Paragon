@@ -167,7 +167,7 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 
 	BindMoveSpeedAttribute();
 
-	// 머리 위 위젯 — per-character FloatingStatusWidgetController 생성·바인딩.
+	// 머리 위 위젯 — 공용 초기화(AP1CharacterBase::InitFloatingStatusWidget)에 히어로 전용 세팅만 얹는다.
 	if (IsValid(FloatingStatusComponent))
 	{
 		// 자기 자신의 머리 위 바는 자기 화면엔 안 보여야 한다 — 아래 HUD 생성과 동일하게
@@ -175,30 +175,16 @@ void AP1HeroCharacter::HandleAbilitySystemReady()
 		// 정상 표시된다. Space=Screen이라 회전/빌보드 처리는 필요 없다.
 		FloatingStatusComponent->SetVisibility(!IsLocallyControlled());
 
-		// WidgetComponent는 UserWidget 인스턴스를 지연 생성한다 — 원격 클라이언트에서 방금 막
-		// 리플리케이트되어 들어온(다른 플레이어의) 폰의 경우, 이 함수가 이 시점에 불릴 때
-		// 아직 위젯이 생성 전이라 GetUserWidgetObject()가 null을 반환할 수 있다. 그러면 이 블록 전체가
-		// 스킵되고, OnRep_PlayerState는 보통 폰 생애주기 중 다시 안 불리므로 그 폰의 머리 위 바가
-		// 영원히 바인딩 안 된 채(0/1 표시) 남는다 — InitWidget()으로 강제 즉시 생성해 이 경쟁을 없앤다.
-		FloatingStatusComponent->InitWidget();
-		if (UP1FloatingStatusWidget* FloatingWidget =
-			Cast<UP1FloatingStatusWidget>(FloatingStatusComponent->GetUserWidgetObject()))
+		// 컨트롤러가 이 호출에서 처음 만들어지는지 — 레벨 델리게이트 구독은 그때 한 번만 해서
+		// 재호출(리스폰 등) 시 중복 바인딩되지 않게 한다.
+		const bool bFirstInit = (FloatingStatusWidgetController == nullptr);
+		if (UP1FloatingStatusWidget* FloatingWidget = InitFloatingStatusWidget(P1PS, ASC, P1PS->GetAttributeSet(), IsLocallyControlled()))
 		{
-			if (!FloatingStatusWidgetController)
+			if (bFirstInit)
 			{
-				const FWidgetControllerParams Params(nullptr, P1PS, ASC, P1PS->GetAttributeSet());
-				FloatingStatusWidgetController = NewObject<UP1FloatingStatusWidgetController>(this);
-				FloatingStatusWidgetController->SetWidgetControllerParams(Params);
-				FloatingStatusWidgetController->SetIsLocallyOwned(IsLocallyControlled());
-				FloatingStatusWidgetController->BindCallbacksToDependencies();
-
-				// 레벨은 이 컨트롤러 델리게이트 목록에 없는 PlayerState의 plain int라 여기서
-				// 직접 구독한다 — 컨트롤러를 처음 만들 때 한 번만 구독해 재호출(리스폰 등) 시
-				// 중복 바인딩되지 않게 한다.
+				// 레벨은 컨트롤러 델리게이트 목록에 없는 PlayerState의 plain int라 여기서 직접 구독한다.
 				P1PS->OnCharacterLevelChangedNative.AddUObject(this, &AP1HeroCharacter::OnCharacterLevelChangedForFloatingStatus);
 			}
-			FloatingWidget->SetWidgetController(FloatingStatusWidgetController);
-			FloatingStatusWidgetController->BroadcastInitialValues();
 			FloatingWidget->SetCharacterName(HeroDisplayName);
 			FloatingWidget->SetLevel(P1PS->GetCharacterLevel());
 		}

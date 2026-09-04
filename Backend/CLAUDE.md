@@ -57,7 +57,7 @@ com.p1.backend
 | `controller/MatchController` | 완료 | `POST /api/match/queue`(body: `{heroId}`, `QueueRequest`, `@RequestBody(required = false)`라 바디 없는 요청도 허용), `POST /api/match/leave`, `GET /api/match/status` |
 | 컴파일 검증 | 완료 | `./mvnw compile` 성공 |
 | MySQL 기동 후 curl 엔드투엔드 검증 | 완료 | signup×2→login×2→queue×2(WAITING→MATCHED, 대기 중이던 유저도 재조회 시 MATCHED)+에러 경로(409/401/401) 확인. 이후 `leaveQueue` 추가분도 별도 검증: 혼자 참가 후 이탈→NOT_QUEUED, 매칭 성사 후 이탈 시도→취소 거부되고 MATCHED 유지 |
-| 언리얼 PreGame 연동 (HTTP 클라이언트, 로그인/큐 UI) | 미완료 | `P1/` 저장소 쪽 작업, 별도 진행 중 |
+| 언리얼 PreGame 연동 (HTTP 클라이언트, 로그인/큐 UI) | 완료 | `P1/Source/P1/Online/P1BackendSubsystem`(GameInstanceSubsystem, HTTP+폴링+델리게이트) — 로그인→히어로 픽→매칭→`ClientTravel`까지 PIE/패키지드 빌드에서 반복 검증됨. 헤드리스 봇(`UP1BotLobbyComponent`)도 같은 API로 이 서버에 붙는다 |
 
 ## 다음 작업 예정
 

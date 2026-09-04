@@ -8,7 +8,6 @@
 #include "GenericTeamAgentInterface.h"
 #include "ActiveGameplayEffectHandle.h"
 #include "GameplayAbilitySpecHandle.h"
-#include "Net/Core/PushModel/PushModel.h"
 #include "P1PlayerState.generated.h"
 
 class UP1AbilitySystemComponent;
@@ -36,10 +35,9 @@ public:
 	virtual void SetGenericTeamId(const FGenericTeamId& NewTeamId) override;
 	virtual FGenericTeamId GetGenericTeamId() const override;
 
-	// 캐릭터(영웅) 레벨 — 개별 어빌리티 레벨(FGameplayAbilitySpec::Level, 스킬 랭크 개념)과는 별개의 축.
-	// 아직 실제 레벨업 시스템이 없어 항상 1로 시작하지만, Stoicism 패시브처럼 "스킬 랭크가 아니라
-	// 캐릭터 레벨(1~18)에 따라 값이 달라져야 하는" 어빌리티가 참조할 자리를 미리 마련해둔 것 —
-	// 나중에 레벨업 시스템이 SetCharacterLevel()만 호출해주면 된다.
+	// 캐릭터(영웅) 레벨(1~18) — 개별 어빌리티 레벨(FGameplayAbilitySpec::Level, 스킬 랭크 개념)과는 별개의 축.
+	// AP1HeroCharacter::CheckLevelUp()이 Experience 임계치를 넘을 때마다 SetCharacterLevel()로 올린다.
+	// Stoicism 패시브 쿨다운, R 랭크 게이트(6/11/15), 기본 스탯 재적용(ApplyBaseStatsForLevel)이 이 값을 참조.
 	int32 GetCharacterLevel() const { return CharacterLevel; }
 	void SetCharacterLevel(int32 NewLevel);
 
@@ -50,7 +48,7 @@ public:
 	// 스코어보드에서는 자기 자신 행만 뜨고 나머지는 비는 버그가 났다 — 그래서 값 자체를 PlayerState의
 	// 복제 프로퍼티로 들고 다닌다(Pawn이 사망~리스폰 사이 없어도 값이 유지되는 부가 이점도 있음).
 	FText GetHeroDisplayName() const { return HeroDisplayName; }
-	void SetHeroDisplayName(const FText& NewName) { if (HasAuthority()) { HeroDisplayName = NewName; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, HeroDisplayName, this); } }
+	void SetHeroDisplayName(const FText& NewName);   // 서버에서만 호출
 
 	// HUD(레벨/KDA/스킬포인트) 갱신용 네이티브 델리게이트 — GAS 어트리뷰트가 아닌 plain 복제 int라
 	// GetGameplayAttributeValueChangeDelegate() 경로를 못 쓰므로 직접 브로드캐스트한다. 값을 바꾸는
@@ -75,8 +73,8 @@ public:
 	// UP1AbilitySystemComponent::ServerInvestSkillPoint()가 호출한다(포인트 검증 + 소비를 그쪽 로직과
 	// 같은 서버 함수 안에서 원자적으로 처리하기 위해, 여기서는 0 이하로 내려가지 않도록만 방어).
 	int32 GetSkillPoints() const { return SkillPoints; }
-	void AddSkillPoint() { if (HasAuthority()) { ++SkillPoints; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this); OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
-	void SpendSkillPoint() { if (HasAuthority() && SkillPoints > 0) { --SkillPoints; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this); OnSkillPointsChangedNative.Broadcast(SkillPoints); } }
+	void AddSkillPoint();     // 서버에서만 호출
+	void SpendSkillPoint();   // 서버에서만 호출
 
 	// --- 킬/데스/어시스트 (전투 보상 시스템) ---
 	int32 GetKills() const { return Kills; }
@@ -89,10 +87,11 @@ public:
 	float GetLastDeathTime() const { return LastDeathTime; }
 
 	// UP1AttributeSet::HandleKillRewards()에서만 호출 — 서버 전용(Damage GE는 항상 서버에서만 적용되므로
-	// 이 함수들이 클라에서 불릴 일 자체가 없다).
-	void AddKill() { ++Kills; ++KillStreak; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Kills, this); MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
-	void AddDeath() { ++Deaths; KillStreak = 0; if (const UWorld* World = GetWorld()) { LastDeathTime = World->GetTimeSeconds(); } MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Deaths, this); MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
-	void AddAssist() { ++Assists; MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Assists, this); OnKDAChangedNative.Broadcast(Kills, Deaths, Assists); }
+	// 이 함수들이 클라에서 불릴 일 자체가 없다). 구현은 .cpp — 복제 프로퍼티를 바꾸는 함수는 Push Model
+	// dirty 마킹이 반드시 따라붙어야 해서, 한 줄 인라인에 숨기지 않고 눈에 띄게 둔다.
+	void AddKill();
+	void AddDeath();
+	void AddAssist();
 
 	// --- 스턴 종료 시각(머리 위 스턴바 카운트다운용) ---
 	// 서버가 스턴 적용 시 "스턴이 끝나는 서버 월드 시각"(GetWorld()->GetTimeSeconds() + 지속시간)을 여기

@@ -223,7 +223,7 @@ void AP1JungleCampAnchor::CheckTeamVisionOfDeadCamp()
 		// 성공/실패 모두 남긴다 — "탐지 범위 안에 들어갔는데 갱신이 안 된다"는 증상을 진단할 때, 이 로그가
 		// 아예 안 찍히면 팀 배정/생존 여부(위 continue들) 쪽이 원인이고, 찍히는데 거리가 기준을 못 넘으면
 		// 실제로는 VisionCheckRadius 밖이었다는 뜻 — 둘을 구분하기 위한 임시 진단용.
-		UE_LOG(LogP1, Log, TEXT("[JungleCampAnchor] VisionCheck — Team %d, %s, 거리=%.0f, 기준=%.0f, 범위안=%d (%s)"),
+		UE_LOG(LogP1, Verbose, TEXT("[JungleCampAnchor] VisionCheck — Team %d, %s, 거리=%.0f, 기준=%.0f, 범위안=%d (%s)"),
 			TeamId, *AllyPawn->GetName(), FMath::Sqrt(DistSq), VisionCheckRadius, bInRange, *GetName());
 
 		if (bInRange)

@@ -174,7 +174,7 @@ void UP1BotArenaComponent::ApplyTeamPatrolOffsetIfReady()
 	}
 
 	const uint8 TeamId = P1PS->GetGenericTeamId().GetId();
-	if (TeamId == 255) // FGenericTeamId::NoTeam — 팀 배정 전, 다음 BotTick에서 재시도.
+	if (TeamId == FGenericTeamId::NoTeam.GetId()) // 팀 배정 전, 다음 BotTick에서 재시도.
 	{
 		return;
 	}

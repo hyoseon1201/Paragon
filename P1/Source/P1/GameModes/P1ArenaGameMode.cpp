@@ -122,10 +122,10 @@ AActor* AP1ArenaGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		return Super::ChoosePlayerStart_Implementation(Player);
 	}
 
-	// 팀이 아직 미배정(255)인 경우에만 새로 배정 — 리스폰 시에는 기존 팀 유지.
+	// 팀이 아직 미배정(NoTeam)인 경우에만 새로 배정 — 리스폰 시에는 기존 팀 유지.
 	// ChoosePlayerStart가 PostLogin보다 먼저 호출되므로 여기서 팀을 배정한다.
 	uint8 TeamId = PS->GetGenericTeamId().GetId();
-	if (TeamId == 255)
+	if (TeamId == FGenericTeamId::NoTeam.GetId())
 	{
 		TeamId = static_cast<uint8>(NextTeamIndex % FMath::Max(1, NumTeams));
 		PS->SetGenericTeamId(FGenericTeamId(TeamId));

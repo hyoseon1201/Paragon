@@ -148,9 +148,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "JungleMonster")
 	TSubclassOf<UGameplayEffect> DefaultAttributesEffectClass;
 
-	// DefaultAttributesEffectClass를 평가할 레벨(1~18) — GE 스펙의 Level로 그대로 전달되어 Scalable
-	// Float 커브를 이 값 기준으로 조회한다. 지금은 스폰 시 고정값이고, 나중에 매치 경과 시간 기반
-	// 몬스터 레벨링 시스템이 붙으면 스폰 전에 이 값만 설정해주면 된다(재적용 로직은 그때 추가).
+	// DefaultAttributesEffectClass를 평가할 레벨 — GE 스펙의 Level로 그대로 전달되어 Scalable Float 커브를
+	// 이 값 기준으로 조회한다(체력/공격력 등이 레벨에 따라 커짐). AP1JungleCampAnchor가 매치 경과 시간
+	// (CT_MonsterLevelByMatchTime)으로 계산해 스폰 직전(FinishSpawning 전) SetMonsterLevel()로 넣어주며,
+	// 이후 바뀌지 않는다. 복제(COND_InitialOnly)는 머리 위 위젯의 레벨 표시용 — 안 하면 클라이언트는
+	// 생성자 기본값 1만 보게 된다(실제로 겪은 버그).
 	UPROPERTY(Replicated, EditAnywhere, Category = "JungleMonster", meta = (ClampMin = "1"))
 	int32 MonsterLevel = 1;
 

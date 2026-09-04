@@ -6,6 +6,7 @@
 #include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "AbilitySystem/P1GameplayTags.h"
 #include "Net/UnrealNetwork.h"
+#include "Net/Core/PushModel/PushModel.h"
 #include "Engine/CurveTable.h"
 #include "Engine/DataTable.h"
 #include "GameplayEffect.h"
@@ -66,6 +67,64 @@ void AP1PlayerState::SetStunEndServerTime(float NewEndServerTime)
 		// 서버(리슨서버/호스트)에선 OnRep이 안 불리므로 여기서 직접 브로드캐스트 — CharacterLevel 등과 동일 패턴.
 		OnStunTimeChangedNative.Broadcast();
 	}
+}
+
+void AP1PlayerState::SetHeroDisplayName(const FText& NewName)
+{
+	if (HasAuthority())
+	{
+		HeroDisplayName = NewName;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, HeroDisplayName, this);
+	}
+}
+
+void AP1PlayerState::AddSkillPoint()
+{
+	if (HasAuthority())
+	{
+		++SkillPoints;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this);
+		OnSkillPointsChangedNative.Broadcast(SkillPoints);
+	}
+}
+
+void AP1PlayerState::SpendSkillPoint()
+{
+	if (HasAuthority() && SkillPoints > 0)
+	{
+		--SkillPoints;
+		MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, SkillPoints, this);
+		OnSkillPointsChangedNative.Broadcast(SkillPoints);
+	}
+}
+
+void AP1PlayerState::AddKill()
+{
+	++Kills;
+	++KillStreak;
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Kills, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this);
+	OnKDAChangedNative.Broadcast(Kills, Deaths, Assists);
+}
+
+void AP1PlayerState::AddDeath()
+{
+	++Deaths;
+	KillStreak = 0;
+	if (const UWorld* World = GetWorld())
+	{
+		LastDeathTime = World->GetTimeSeconds();
+	}
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Deaths, this);
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, KillStreak, this);
+	OnKDAChangedNative.Broadcast(Kills, Deaths, Assists);
+}
+
+void AP1PlayerState::AddAssist()
+{
+	++Assists;
+	MARK_PROPERTY_DIRTY_FROM_NAME(AP1PlayerState, Assists, this);
+	OnKDAChangedNative.Broadcast(Kills, Deaths, Assists);
 }
 
 float AP1PlayerState::GetXPRequiredForNextLevel() const

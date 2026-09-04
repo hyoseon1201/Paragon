@@ -10,6 +10,7 @@
 #include "P1CharacterBase.generated.h"
 
 class UAbilitySystemComponent;
+class UAttributeSet;
 class UP1FloatingWidgetComponent;
 class UP1FloatingStatusWidget;
 class UP1FloatingStatusWidgetController;
@@ -114,17 +115,25 @@ public:
 	void MulticastDrawDebugSphere(FVector Location, float Radius, FColor Color, float Duration);
 
 protected:
-	// 팀 식별자. 0=팀1, 1=팀2, 255=NoTeam. 각 캐릭터 BP에서 설정.
-	// 추후 GameMode가 서버에서 할당하는 방식으로 교체 예정.
-	UPROPERTY(EditAnywhere, Category = "Team")
-	uint8 TeamId = 255;
+	// 머리 위 상태 위젯 공용 초기화 — WidgetComponent의 UserWidget 인스턴스를 즉시 생성(InitWidget)하고
+	// per-character 컨트롤러를 최초 1회만 만들어 바인딩한 뒤 초기값을 브로드캐스트한다. 히어로/정글 몬스터가
+	// 각자 들고 있던 동일한 블록을 여기로 합쳤다 — 반환된 위젯에 대한 이름/레벨 등 캐릭터별 세팅은 호출자가 이어서 한다.
+	// InitWidget()을 강제 호출하는 이유: 원격 클라이언트에서 막 리플리케이트된 폰은 이 시점에 위젯이 아직
+	// 지연 생성 전이라 GetUserWidgetObject()가 null일 수 있고, 그러면 그 폰의 머리 위 바가 영원히 바인딩되지
+	// 않는다(실제로 겪은 버그). 위젯을 못 얻으면 nullptr 반환(컨트롤러도 만들지 않으므로 다음 호출에 재시도됨).
+	UP1FloatingStatusWidget* InitFloatingStatusWidget(APlayerState* PS, UAbilitySystemComponent* ASC, UAttributeSet* AS, bool bLocallyOwned);
 
-	// 캐릭터 유형. 생성자에서 Character.Type.Hero로 기본 설정.
-	// 미니언/보스 BP에서 각각 Minion/Boss로 변경.
+	// 팀 식별자(IGenericTeamAgentInterface). 히어로는 이 값을 쓰지 않고 AP1HeroCharacter::GetGenericTeamId()가
+	// PlayerState의 팀(AP1ArenaGameMode가 접속 순서로 배정)을 반환한다 — 이 필드는 PlayerState가 없는
+	// 캐릭터(정글 몬스터: MonsterTeamId=254 고정)용. 기본값은 NoTeam(255)=팀 미배정.
+	UPROPERTY(EditAnywhere, Category = "Team")
+	uint8 TeamId = FGenericTeamId::NoTeam.GetId();
+
+	// 캐릭터 유형(Character.Type.Hero/Monster). 생성자에서 Hero로 기본 설정, 정글 몬스터 생성자가 Monster로 재설정.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character")
 	FGameplayTag CharacterType;
 
-	// ASC의 원본은 AP1HeroCharacter는 PlayerState, AP1MinionCharacter는 Pawn 자신에 있음.
+	// ASC의 원본은 AP1HeroCharacter는 PlayerState, AP1JungleMonsterCharacter는 Pawn 자신에 있음.
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedAbilitySystemComponent;
 

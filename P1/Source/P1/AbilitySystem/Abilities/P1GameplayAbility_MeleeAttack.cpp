@@ -9,7 +9,6 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystem/P1AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityRepAnimMontage.h"
 #include "Animation/AnimMontage.h"
 #include "DrawDebugHelpers.h"
@@ -124,9 +123,11 @@ void UP1GameplayAbility_MeleeAttack::PlayCurrentComboMontage()
 	// 다른 어빌리티(RMB/E/R)가 쓰는 기본 Position 모드에 영향을 주지 않도록 한다.
 	// bSkipPlayRate는 쓰지 않는다 — PlayRate가 AttackSpeed에 따라 달라지므로(GetComputedMontagePlayRate) 꺼지면
 	// 시뮬레이티드 프록시가 공격속도 변화를 화면에서 못 보게 된다.
-	if (UP1AbilitySystemComponent* ASC = Cast<UP1AbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo()))
+	// 엔진 공개 API(UAbilitySystemComponent::SetMontageRepAnimPositionMethod)를 그대로 쓴다 — 한때
+	// UP1AbilitySystemComponent에 같은 일을 하는 래퍼를 뒀었는데, 엔진이 이미 public으로 제공하고 있어 제거했다.
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
 	{
-		ASC->SetRepAnimPositionMethod(ERepAnimPositionMethod::CurrentSectionId);
+		ASC->SetMontageRepAnimPositionMethod(ERepAnimPositionMethod::CurrentSectionId);
 	}
 
 	// OnlyTriggerOnce=true: 콤보 스텝 하나당 히트 판정 1회만 허용.
