@@ -84,8 +84,3 @@ Unreal Insights Networking으로 복제 비용을 측정하고, 다음 항목을
 - 서버 패키징: Scripts/Package_Server.bat
 - 봇 실행: Scripts/Run_Bots.bat
 - 서버 실행: Scripts/Run_Server.bat
-
-## 관련 문서
-
-포트폴리오 요약: ../Docs/Portfolio/Portfolio_Summary.md  
-기술 문서: ../Docs/Portfolio/tech/

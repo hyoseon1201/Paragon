@@ -49,6 +49,7 @@ void AP1PlayerController::BeginPlay()
 		// 세팅해야 한다. 서버 NetServerMaxTickRate(실전 목표 60Hz, 2코어 기준)에 맞춰 1/60로 세팅.
 		if (AGameNetworkManager* NetworkManagerCDO = GetMutableDefault<AGameNetworkManager>())
 		{
+			// 서버 60Hz 틱에 맞춰 이동 전송 주기를 60Hz로 정렬한다.
 			NetworkManagerCDO->ClientNetSendMoveDeltaTime = 0.0166f;
 			NetworkManagerCDO->ClientNetSendMoveDeltaTimeThrottled = 0.0166f;
 			NetworkManagerCDO->ClientNetSendMoveDeltaTimeStationary = 0.0166f;
